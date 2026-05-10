@@ -1,0 +1,8 @@
+pandas
+openpyxl
+python-pptx
+requests
+opencv-python-headless
+tkcalendar
+lxml
+streamlit
