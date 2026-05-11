@@ -26,9 +26,7 @@ if "reset_key" not in st.session_state:
 
 # --- REFRESH FUNCTION ---
 def refresh_callback():
-    # Incrementing this key forces all widgets to re-render from scratch
     st.session_state.reset_key += 1
-    # Clear all other session data
     for key in list(st.session_state.keys()):
         if key != "reset_key":
             del st.session_state[key]
@@ -143,7 +141,6 @@ def create_custom_slide(pres, slide_template):
     return new_slide
 
 # --- MAIN FORM CONTAINER ---
-# Changing this key via the refresh button resets everything inside it.
 with st.container(key=f"form_{st.session_state.reset_key}"):
     TEMPLATE_FILENAME = "template.pptx"
     template_exists = os.path.exists(TEMPLATE_FILENAME)
@@ -169,7 +166,6 @@ with st.container(key=f"form_{st.session_state.reset_key}"):
     with btn_col1:
         generate_btn = st.button("RUN GENERATOR", use_container_width=True)
     with btn_col2:
-        # Refresh button calls the reset callback
         st.button("REFRESH", use_container_width=True, on_click=refresh_callback)
 
 # --- EXECUTION ---
@@ -194,7 +190,10 @@ if generate_btn:
                 slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
                 slide1_template, slide2_template, slide3_template = prs.slides[0], prs.slides[1], prs.slides[2]
                 processed_count, total = 0, len(filtered_data)
-                progress_bar, status_text = st.progress(0), st.empty()
+                
+                # Setup UI trackers
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 summary_list = []
 
                 for _, row in filtered_data.iterrows():
@@ -220,9 +219,14 @@ if generate_btn:
                     download_and_insert_media(new_data_slide, row.iloc[26], 0.6, 2.1, 3.8)
                     new_v_slide = create_custom_slide(prs, slide2_template)
                     download_and_insert_media(new_v_slide, row.iloc[26], 0, 0, 0, True)
+                    
                     processed_count += 1
                     progress_bar.progress(processed_count / total)
                     status_text.text(f"COMPILING... {processed_count}/{total}")
+
+                # FIX: Set final status after loop completes
+                progress_bar.progress(1.0)
+                status_text.text(f"DONE! {total}/{total}")
 
                 if summary_list:
                     new_sum_slide = create_custom_slide(prs, slide3_template)
@@ -243,6 +247,7 @@ if generate_btn:
                 ppt_output = io.BytesIO()
                 prs.save(ppt_output)
                 ppt_output.seek(0)
+                
                 st.success(f"COMPLETE: {int(time.time()-start_time)}S")
                 st.download_button("DOWNLOAD GENERATED PPTX", ppt_output, f"{report_title}.pptx", use_container_width=True)
         except Exception as e: st.error(f"SYSTEM ERROR: {str(e)}")
