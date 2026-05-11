@@ -99,6 +99,15 @@ st.set_page_config(page_title="Auto Generate Report Observation", layout="center
 st.title("📊 Auto Generate Report Observation")
 st.subheader("Sure Stop v1")
 
+# AUTOMATIC TEMPLATE CHECK
+TEMPLATE_FILENAME = "template.pptx"
+template_exists = os.path.exists(TEMPLATE_FILENAME)
+
+if not template_exists:
+    st.error(f"❌ '{TEMPLATE_FILENAME}' not found in GitHub repository. Please upload it to your repo.")
+else:
+    st.success(f"✅ Template '{TEMPLATE_FILENAME}' loaded from repository.")
+
 # Inputs
 col1, col2 = st.columns(2)
 
@@ -116,13 +125,14 @@ with col2:
 
 st.divider()
 
-# File Uploaders
+# File Uploader for Excel
 uploaded_excel = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
-uploaded_template = st.file_uploader("Upload PPTX Template (template.pptx)", type=["pptx"])
 
 if st.button("🚀 Generate Report", use_container_width=True):
-    if not uploaded_excel or not uploaded_template:
-        st.error("Please upload both the Excel file and the PPTX template.")
+    if not uploaded_excel:
+        st.error("Please upload the Excel file.")
+    elif not template_exists:
+        st.error("Cannot proceed: Template file is missing from the repository.")
     else:
         try:
             start_time = time.time()
@@ -146,8 +156,8 @@ if st.button("🚀 Generate Report", use_container_width=True):
             if filtered_data.empty:
                 st.warning(f"No records found for {selected_depot} in the selected date range.")
             else:
-                # Load Presentation from memory
-                prs = Presentation(io.BytesIO(uploaded_template.read()))
+                # Load Presentation from local file (GitHub Repo)
+                prs = Presentation(TEMPLATE_FILENAME)
 
                 slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
                 slide1_template = prs.slides[0]
