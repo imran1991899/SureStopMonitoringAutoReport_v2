@@ -12,6 +12,7 @@ import copy
 import time
 from datetime import datetime
 import streamlit as st
+import io
 
 # --- STREAMLIT SETTINGS (Black Theme with Black Text Customization) ---
 st.set_page_config(
@@ -150,8 +151,44 @@ def create_custom_slide(pres, slide_template):
 
 # --- STREAMLIT UI ---
 
-st.title("📊 Auto Generate Report Observation")
-st.subheader("Sure Stop v1")
+# Custom header mimicking the design template
+st.markdown("""
+<div style="background-color: #111111; padding: 10px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #1a1a1a;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="margin: 0; color: #FFFFFF !important; font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 24px; font-weight: bold;">VEHICLE DETAILS</h1>
+        <div style="color: #FF1A1A; font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 20px; font-weight: bold; cursor: pointer;">✕</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Custom vehicle data points based on template. We wrap them in styled divs.
+vehicle_info = {
+    "STATUS": "<span style='background-color: #00FF00; color: #000000; padding: 2px 8px; border-radius: 12px; font-weight: bold;'>ONLINE</span>",
+    "ORDERS": "1 DROPOFF",
+    "VEHICLE PLATE": "RAPID217",
+    "DEPOT": "Cheras Selatan",
+    "ZONE": "T640B",
+    "ORIGIN-DESTINATION (OD)": "Taman Medan - Sunway",
+    "DRIVER NAME": "MOHAMMAD SYAFIQ BIN SHUKRI",
+    "STAFF ID": "10023642",
+    "PHONE NUMBER": "+60 189804080",
+    "LAST UPDATE": "3:02 PM (4 min ago)",
+    "SPEED": "0 km/h",
+    "HEADING": "0°",
+    "COORDINATES": "3.066447, 101.635693"
+}
+
+st.markdown("<div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; background-color: #FFFFFF; padding: 15px; border-radius: 10px;'>", unsafe_allow_html=True)
+for label, value in vehicle_info.items():
+    st.markdown(f"""
+        <div>
+            <div style="font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 12px; color: #888888; text-transform: uppercase;">{label}</div>
+            <div style="font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 16px; color: #00FF00; font-weight: bold; margin-top: 2px;">{value}</div>
+        </div>
+    """, unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+st.divider()
 
 # AUTOMATIC TEMPLATE CHECK
 TEMPLATE_FILENAME = "template.pptx"
