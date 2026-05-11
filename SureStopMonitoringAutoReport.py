@@ -13,22 +13,58 @@ import time
 from datetime import datetime
 import streamlit as st
 
-# --- STREAMLIT SETTINGS (Dark Theme) ---
+# --- STREAMLIT SETTINGS (Black Theme with Black Text Customization) ---
 st.set_page_config(
     page_title="Auto Generate Report Observation", 
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for a deeper "Black Theme" look
+# Custom CSS: Black background, White Title, but Black text for labels/inputs
 st.markdown("""
     <style>
+    /* Main Background */
     .stApp {
-        background-color: #0E1117;
-        color: #FFFFFF;
+        background-color: #000000;
     }
-    .stButton>button {
-        border-radius: 5px;
+    
+    /* Main Title (White) */
+    h1 {
+        color: #FFFFFF !important;
+    }
+    
+    /* Subheader (White) */
+    h3 {
+        color: #FFFFFF !important;
+    }
+
+    /* All other text/labels (Black) */
+    label, p, span, .stMarkdown {
+        color: #000000 !important;
+    }
+
+    /* Input Backgrounds (White so black text is visible) */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    
+    /* Upload Box Text */
+    .stFileUploader section {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    
+    /* Divider */
+    hr {
+        border-color: #333333 !important;
+    }
+    
+    /* Containers for better contrast */
+    [data-testid="stVerticalBlock"] > div {
+        background-color: #FFFFFF;
+        padding: 10px;
+        border-radius: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -122,9 +158,9 @@ TEMPLATE_FILENAME = "template.pptx"
 template_exists = os.path.exists(TEMPLATE_FILENAME)
 
 if not template_exists:
-    st.error(f"❌ '{TEMPLATE_FILENAME}' not found in GitHub repository. Please upload it to your repo.")
+    st.error(f"❌ '{TEMPLATE_FILENAME}' not found in GitHub repository.")
 else:
-    st.success(f"✅ Template '{TEMPLATE_FILENAME}' loaded from repository.")
+    st.success(f"✅ Template '{TEMPLATE_FILENAME}' loaded.")
 
 # Inputs
 col1, col2 = st.columns(2)
@@ -153,14 +189,16 @@ with btn_col1:
     generate_btn = st.button("🚀 Generate Report", use_container_width=True)
 
 with btn_col2:
-    if st.button("🔄 Refresh", use_container_width=True):
+    # Fixed Refresh Logic
+    if st.button("🔄 Refresh", use_container_width=True, key="refresh_trigger"):
+        st.cache_data.clear()
         st.rerun()
 
 if generate_btn:
     if not uploaded_excel:
         st.error("Please upload the Excel file.")
     elif not template_exists:
-        st.error("Cannot proceed: Template file is missing from the repository.")
+        st.error("Cannot proceed: Template file is missing.")
     else:
         try:
             start_time = time.time()
@@ -182,9 +220,8 @@ if generate_btn:
             filtered_data = df.loc[mask].copy()
 
             if filtered_data.empty:
-                st.warning(f"No records found for {selected_depot} in the selected date range.")
+                st.warning(f"No records found for {selected_depot}.")
             else:
-                # Load Presentation from local file (GitHub Repo)
                 prs = Presentation(TEMPLATE_FILENAME)
 
                 slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
@@ -203,7 +240,6 @@ if generate_btn:
                     if str(row.iloc[8]).strip().lower() == "yes": continue
 
                     summary_list.append(row)
-
                     new_data_slide = create_custom_slide(prs, slide1_template)
                     dt_raw = pd.to_datetime(row.iloc[0])
                     date_str = dt_raw.strftime('%d/%m/%Y') if not pd.isnull(dt_raw) else "N/A"
@@ -244,7 +280,6 @@ if generate_btn:
                                                 for run in paragraph.runs: run.font.size = Pt(10)
 
                     download_and_insert_media(new_data_slide, row.iloc[26], left_inch=0.6, top_inch=2.1, width_inch=3.8, is_video_slide=False)
-
                     new_video_slide = create_custom_slide(prs, slide2_template)
                     download_and_insert_media(new_video_slide, row.iloc[26], left_inch=0, top_inch=0, width_inch=0, is_video_slide=True)
 
@@ -255,17 +290,14 @@ if generate_btn:
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
                     orig_table_shape = next((s for s in new_summary_slide.shapes if s.has_table), None)
-
                     if orig_table_shape:
                         height = orig_table_shape.height
                         rows_needed, cols_needed = len(summary_list) + 1, 6
                         style_id = orig_table_shape.table._tbl.find('.//a:tableStyleId', namespaces=orig_table_shape.table._tbl.nsmap)
                         style_id_val = style_id.text if style_id is not None else "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
-
                         new_summary_slide.shapes._spTree.remove(orig_table_shape.element)
                         new_table_shape = new_summary_slide.shapes.add_table(rows_needed, cols_needed, Inches(0.5), Inches(1.5), Inches(9.0), height)
                         summary_table = new_table_shape.table
-                        
                         summary_table.columns[0].width = Inches(1.2); summary_table.columns[1].width = Inches(0.8)
                         summary_table.columns[2].width = Inches(1.0); summary_table.columns[3].width = Inches(2.2)
                         summary_table.columns[4].width = Inches(2.6); summary_table.columns[5].width = Inches(1.2)
@@ -281,10 +313,7 @@ if generate_btn:
                         for idx, s_row in enumerate(summary_list):
                             tr = summary_table.rows[idx + 1]
                             tr.height = Inches(0.7)
-                            tr.cells[0].text = str(s_row.iloc[3])
-                            tr.cells[1].text = str(s_row.iloc[4])
-                            tr.cells[2].text = str(s_row.iloc[6])
-                            tr.cells[3].text = str(s_row.iloc[5])
+                            tr.cells[0].text = str(s_row.iloc[3]); tr.cells[1].text = str(s_row.iloc[4]); tr.cells[2].text = str(s_row.iloc[6]); tr.cells[3].text = str(s_row.iloc[5])
                             dt_full = pd.to_datetime(s_row.iloc[0]).strftime('%d/%m/%Y %H:%M:%S')
                             tr.cells[4].text = f"ID: {s_row.iloc[31]}\nNama: {s_row.iloc[32]}\nLaju: {s_row.iloc[30]} Km/h\nMasa: {dt_full}"
                             tr.cells[5].text = "Tidak Mematuhi"
@@ -328,22 +357,20 @@ if generate_btn:
                                         paragraph.text = paragraph.text.replace("OE/SQI/CR/VO/001/2026", selected_siri)
                                         for run in paragraph.runs: run.font.size = Pt(12)
 
-                # Finalize
                 ppt_output = io.BytesIO()
                 prs.save(ppt_output)
                 ppt_output.seek(0)
                 
                 duration = time.time() - start_time
-                st.success(f"Done! Processed in {int(duration // 60)}m {int(duration % 60)}s")
+                st.success(f"Done! ({int(duration // 60)}m {int(duration % 60)}s)")
                 
-                file_name = f"{report_title if report_title else 'Generated_Report'}.pptx"
                 st.download_button(
                     label="📥 Download Presentation",
                     data=ppt_output,
-                    file_name=file_name,
+                    file_name=f"{report_title if report_title else 'Report'}.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True
                 )
 
         except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
+            st.error(f"Error: {str(e)}")
