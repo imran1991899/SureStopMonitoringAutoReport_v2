@@ -28,7 +28,7 @@ st.markdown("""
         background-color: #0B0E0F;
     }
     
-    /* Header Style from the image */
+    /* Header Style */
     .custom-header {
         background-color: #111516;
         border-bottom: 2px solid #00FF66;
@@ -89,25 +89,29 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* Divider color */
     hr {
         border-color: #1A1E1F !important;
     }
 
-    /* Progress Bar */
     .stProgress > div > div > div > div {
         background-color: #00FF66 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER INJECTION ---
+# --- HEADER ---
 st.markdown("""
     <div class="custom-header">
         <p class="header-title">OBSERVATION DETAILS</p>
         <span style="color: #FF3366; font-weight: bold; font-family: sans-serif; cursor: pointer;">✕</span>
     </div>
     """, unsafe_allow_html=True)
+
+# --- REFRESH FUNCTION ---
+def clear_all():
+    for key in st.session_state.keys():
+        del st.session_state[key]
+    st.rerun()
 
 # --- CORE LOGIC (Original preserved) ---
 
@@ -188,7 +192,7 @@ def create_custom_slide(pres, slide_template):
 
     return new_slide
 
-# --- STREAMLIT UI INPUTS ---
+# --- STREAMLIT UI ---
 
 # AUTOMATIC TEMPLATE CHECK
 TEMPLATE_FILENAME = "template.pptx"
@@ -203,21 +207,21 @@ else:
 col1, col2 = st.columns(2)
 
 with col1:
-    report_title = st.text_input("REPORT TITLE", placeholder="Input Title...")
-    obs_month = st.selectbox("OBSERVATION MONTH", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
-    start_date = st.date_input("START DATE", value=datetime(2026, 1, 1))
+    report_title = st.text_input("REPORT TITLE", placeholder="Input Title...", key="ti_title")
+    obs_month = st.selectbox("OBSERVATION MONTH", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], key="sb_month")
+    start_date = st.date_input("START DATE", value=datetime(2026, 1, 1), key="di_start")
 
 with col2:
     depot_list = ["MRT Jinjang", "Shah Alam", "Cheras Selatan", "Batu Caves", "MRT Kajang", "MRT Sungai Buloh", "MRT Serdang"]
-    selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
+    selected_depot = st.selectbox("DEPOT LOCATION", depot_list, key="sb_depot")
     siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
-    selected_siri = st.selectbox("SIRI NUMBER", siri_list)
-    end_date = st.date_input("END DATE", value=datetime(2026, 12, 31))
+    selected_siri = st.selectbox("SIRI NUMBER", siri_list, key="sb_siri")
+    end_date = st.date_input("END DATE", value=datetime(2026, 12, 31), key="di_end")
 
 st.divider()
 
 # File Uploader
-uploaded_excel = st.file_uploader("UPLOAD DATA SOURCE (EXCEL)", type=["xlsx", "xls"])
+uploaded_excel = st.file_uploader("UPLOAD DATA SOURCE (EXCEL)", type=["xlsx", "xls"], key="fu_excel")
 
 # Action Buttons Side by Side
 btn_col1, btn_col2 = st.columns([3, 1])
@@ -226,9 +230,9 @@ with btn_col1:
     generate_btn = st.button("RUN GENERATOR", use_container_width=True)
 
 with btn_col2:
-    if st.button("REFRESH", use_container_width=True, key="refresh_trigger"):
-        st.cache_data.clear()
-        st.rerun()
+    # This button now calls the clear_all function directly
+    if st.button("REFRESH", use_container_width=True, on_click=clear_all):
+        pass
 
 # --- EXECUTION LOGIC ---
 if generate_btn:
