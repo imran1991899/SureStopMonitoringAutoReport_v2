@@ -1,4 +1,3 @@
-import streamlit as st
 import pandas as pd
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -12,8 +11,9 @@ import cv2
 import copy
 import time
 from datetime import datetime
+import streamlit as st
 
-# --- CORE LOGIC (UNCHANGED) ---
+# --- CORE LOGIC (Original preserved) ---
 
 def download_and_insert_media(slide, link_data, left_inch, top_inch, width_inch, is_video_slide=False):
     if not isinstance(link_data, str) or "drive.google.com" not in link_data:
@@ -94,70 +94,79 @@ def create_custom_slide(pres, slide_template):
 
 # --- STREAMLIT UI ---
 
-st.set_page_config(page_title="Sure Stop Auto Report", layout="centered")
-st.title("🚌 Auto Generate Report Observation Sure Stop")
+st.set_page_config(page_title="Auto Generate Report Observation", layout="centered")
 
-with st.expander("Step 1: Report Information", expanded=True):
-    report_title = st.text_input("Report Filename", "Observation_Report")
-    selected_month = st.selectbox("Observation Month", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
-    selected_depot = st.selectbox("Select Depot", ["MRT Jinjang", "Shah Alam", "Cheras Selatan", "Batu Caves", "MRT Kajang", "MRT Sungai Buloh", "MRT Serdang"])
-    
-    col1, col2 = st.columns(2)
-    start_val = col1.date_input("Start Date")
-    end_val = col2.date_input("End Date")
+st.title("📊 Auto Generate Report Observation")
+st.subheader("Sure Stop v1")
 
-with st.expander("Step 2: Upload Files", expanded=True):
-    uploaded_excel = st.file_uploader("Upload Excel Data", type=["xlsx", "xls"])
-    uploaded_template = st.file_uploader("Upload PPTX Template (template.pptx)", type=["pptx"])
+# Inputs
+col1, col2 = st.columns(2)
 
-if st.button("🚀 Generate Report", type="primary", use_container_width=True):
+with col1:
+    report_title = st.text_input("Title", placeholder="e.g., Monthly Observation")
+    obs_month = st.selectbox("Observation Month", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
+    start_date = st.date_input("Start Date", value=datetime(2026, 1, 1))
+
+with col2:
+    depot_list = ["MRT Jinjang", "Shah Alam", "Cheras Selatan", "Batu Caves", "MRT Kajang", "MRT Sungai Buloh", "MRT Serdang"]
+    selected_depot = st.selectbox("Depot", depot_list)
+    siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
+    selected_siri = st.selectbox("No. Siri", siri_list)
+    end_date = st.date_input("End Date", value=datetime(2026, 12, 31))
+
+st.divider()
+
+# File Uploaders
+uploaded_excel = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
+uploaded_template = st.file_uploader("Upload PPTX Template (template.pptx)", type=["pptx"])
+
+if st.button("🚀 Generate Report", use_container_width=True):
     if not uploaded_excel or not uploaded_template:
-        st.warning("Please upload both the Excel file and the PPTX Template.")
+        st.error("Please upload both the Excel file and the PPTX template.")
     else:
         try:
             start_time = time.time()
             
-            # Read Data
+            # Load Data
             df = pd.read_excel(uploaded_excel, sheet_name='Sheet1')
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
-            
+
             def safe_date_convert(x):
                 try: return pd.to_datetime(x).date()
                 except: return None
 
             df['cleaned_date'] = df.iloc[:, 0].apply(safe_date_convert)
             
-            # Filtering
-            mask = (df['cleaned_date'] >= start_val) & \
-                    (df['cleaned_date'] <= end_val) & \
-                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
+            mask = (df['cleaned_date'] >= start_date) & \
+                   (df['cleaned_date'] <= end_date) & \
+                   (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
 
             filtered_data = df.loc[mask].copy()
 
             if filtered_data.empty:
-                st.error(f"No records found for {selected_depot} in the selected date range.")
+                st.warning(f"No records found for {selected_depot} in the selected date range.")
             else:
-                prs = Presentation(uploaded_template)
-                
-                # Templates
+                # Load Presentation from memory
+                prs = Presentation(io.BytesIO(uploaded_template.read()))
+
+                slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
                 slide1_template = prs.slides[0]
                 slide2_template = prs.slides[1]
                 slide3_template = prs.slides[2]
-                slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
 
                 processed_count = 0
                 total = len(filtered_data)
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-                
+
                 summary_list = []
 
                 for _, row in filtered_data.iterrows():
                     if str(row.iloc[8]).strip().lower() == "yes": continue
-                    
+
                     summary_list.append(row)
+
                     new_data_slide = create_custom_slide(prs, slide1_template)
-                    
                     dt_raw = pd.to_datetime(row.iloc[0])
                     date_str = dt_raw.strftime('%d/%m/%Y') if not pd.isnull(dt_raw) else "N/A"
                     time_str = dt_raw.strftime('%H:%M:%S') if not pd.isnull(dt_raw) else "N/A"
@@ -196,25 +205,32 @@ if st.button("🚀 Generate Report", type="primary", use_container_width=True):
                                                 paragraph.text = paragraph.text.replace(key, str(value))
                                                 for run in paragraph.runs: run.font.size = Pt(10)
 
-                    download_and_insert_media(new_data_slide, row.iloc[26], left_inch=0.6, top_inch=2.1, width_inch=3.8)
+                    download_and_insert_media(new_data_slide, row.iloc[26], left_inch=0.6, top_inch=2.1, width_inch=3.8, is_video_slide=False)
+
                     new_video_slide = create_custom_slide(prs, slide2_template)
-                    download_and_insert_media(new_video_slide, row.iloc[26], is_video_slide=True, left_inch=0, top_inch=0, width_inch=0)
+                    download_and_insert_media(new_video_slide, row.iloc[26], left_inch=0, top_inch=0, width_inch=0, is_video_slide=True)
 
                     processed_count += 1
                     progress_bar.progress(processed_count / total)
-                    status_text.text(f"Processing row {processed_count} of {total}...")
+                    status_text.text(f"Processing... {processed_count}/{total}")
 
-                # --- SUMMARY TABLE LOGIC ---
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
                     orig_table_shape = next((s for s in new_summary_slide.shapes if s.has_table), None)
-                    
+
                     if orig_table_shape:
-                        left, top, width, height = orig_table_shape.left, orig_table_shape.top, orig_table_shape.width, orig_table_shape.height
-                        rows_needed, cols_needed = len(summary_list) + 1, len(orig_table_shape.table.columns)
-                        new_table_shape = new_summary_slide.shapes.add_table(rows_needed, cols_needed, left, top, width, height)
-                        summary_table = new_table_shape.table
+                        height = orig_table_shape.height
+                        rows_needed, cols_needed = len(summary_list) + 1, 6
+                        style_id = orig_table_shape.table._tbl.find('.//a:tableStyleId', namespaces=orig_table_shape.table._tbl.nsmap)
+                        style_id_val = style_id.text if style_id is not None else "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
+
                         new_summary_slide.shapes._spTree.remove(orig_table_shape.element)
+                        new_table_shape = new_summary_slide.shapes.add_table(rows_needed, cols_needed, Inches(0.5), Inches(1.5), Inches(9.0), height)
+                        summary_table = new_table_shape.table
+                        
+                        summary_table.columns[0].width = Inches(1.2); summary_table.columns[1].width = Inches(0.8)
+                        summary_table.columns[2].width = Inches(1.0); summary_table.columns[3].width = Inches(2.2)
+                        summary_table.columns[4].width = Inches(2.6); summary_table.columns[5].width = Inches(1.2)
 
                         headers = ["Depoh", "Laluan", "Nombor Bas", "Hentian Bas", "Pengesahan", "Status"]
                         for i, h_text in enumerate(headers):
@@ -222,10 +238,11 @@ if st.button("🚀 Generate Report", type="primary", use_container_width=True):
                             cell.text = h_text
                             for para in cell.text_frame.paragraphs:
                                 for run in para.runs:
-                                    run.font.size, run.font.bold = Pt(10), True
+                                    run.font.size = Pt(10); run.font.bold = True
 
                         for idx, s_row in enumerate(summary_list):
                             tr = summary_table.rows[idx + 1]
+                            tr.height = Inches(0.7)
                             tr.cells[0].text = str(s_row.iloc[3])
                             tr.cells[1].text = str(s_row.iloc[4])
                             tr.cells[2].text = str(s_row.iloc[6])
@@ -235,51 +252,59 @@ if st.button("🚀 Generate Report", type="primary", use_container_width=True):
                             tr.cells[5].text = "Tidak Mematuhi"
                             for cell in tr.cells:
                                 for para in cell.text_frame.paragraphs:
-                                    for run in para.runs: run.font.size = Pt(8)
+                                    for run in para.runs: run.font.size = Pt(8); run.font.name = "Arial"
 
-                if slide6_template: create_custom_slide(prs, slide6_template)
+                if slide6_template:
+                    create_custom_slide(prs, slide6_template)
 
-                # Cleanup original template slides (First 3)
+                # Slide Reordering Logic
                 xml_slides = prs.slides._sldIdLst
                 for _ in range(3): xml_slides.remove(xml_slides[0])
-                
-                # Reorder
                 if len(prs.slides) >= 3:
-                    summary_index = len(xml_slides) - 2
-                    summary_slide_element = xml_slides[summary_index]
+                    summary_slide_element = xml_slides[len(xml_slides) - 2]
                     xml_slides.remove(summary_slide_element)
                     xml_slides.insert(2, summary_slide_element)
                     slide_two_element = xml_slides[1]
                     xml_slides.remove(slide_two_element)
                     xml_slides.insert(0, slide_two_element)
+                if len(xml_slides) >= 4: xml_slides.remove(xml_slides[3])
 
-                # Standardized Text Replacement
+                # Text replacements
                 current_year = datetime.now().year
-                full_replacement_text = f"Central Region {selected_month} {current_year}"
-                first_slide = prs.slides[0]
-                for shape in first_slide.shapes:
-                    if shape.has_text_frame and "Januari-February 2026" in shape.text_frame.text:
-                        for paragraph in shape.text_frame.paragraphs:
-                            if "Januari-February 2026" in paragraph.text:
-                                paragraph.text = paragraph.text.replace("Januari-February 2026", full_replacement_text)
-                                for run in paragraph.runs:
-                                    run.font.name, run.font.size = 'Arial', Pt(20)
-                                    run.font.color.rgb = RGBColor(0, 32, 96)
+                full_replacement_text = f"Central Region {obs_month} {current_year}"
 
-                # Export to Download Button
-                pptx_io = io.BytesIO()
-                prs.save(pptx_io)
-                pptx_io.seek(0)
+                for slide in prs.slides:
+                    for shape in slide.shapes:
+                        if shape.has_text_frame:
+                            if "Januari-February 2026" in shape.text_frame.text:
+                                for paragraph in shape.text_frame.paragraphs:
+                                    if "Januari-February 2026" in paragraph.text:
+                                        paragraph.text = paragraph.text.replace("Januari-February 2026", full_replacement_text)
+                                        for run in paragraph.runs:
+                                            run.font.name = 'Arial'; run.font.size = Pt(20)
+                                            run.font.color.rgb = RGBColor(0, 32, 96)
+                            
+                            if "OE/SQI/CR/VO/001/2026" in shape.text_frame.text:
+                                for paragraph in shape.text_frame.paragraphs:
+                                    if "OE/SQI/CR/VO/001/2026" in paragraph.text:
+                                        paragraph.text = paragraph.text.replace("OE/SQI/CR/VO/001/2026", selected_siri)
+                                        for run in paragraph.runs: run.font.size = Pt(12)
+
+                # Finalize
+                ppt_output = io.BytesIO()
+                prs.save(ppt_output)
+                ppt_output.seek(0)
                 
                 duration = time.time() - start_time
-                st.success(f"Done! Processed {processed_count} records in {int(duration)}s")
+                st.success(f"Done! Processed in {int(duration // 60)}m {int(duration % 60)}s")
                 
+                file_name = f"{report_title if report_title else 'Generated_Report'}.pptx"
                 st.download_button(
-                    label="📥 Download Generated PowerPoint",
-                    data=pptx_io,
-                    file_name=f"{report_title}.pptx",
+                    label="📥 Download Presentation",
+                    data=ppt_output,
+                    file_name=file_name,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
                 )
 
         except Exception as e:
-            st.error(f"An error occurred: {e}")
+            st.error(f"An error occurred: {str(e)}")
