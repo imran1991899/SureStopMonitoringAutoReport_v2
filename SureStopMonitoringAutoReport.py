@@ -13,6 +13,26 @@ import time
 from datetime import datetime
 import streamlit as st
 
+# --- STREAMLIT SETTINGS (Dark Theme) ---
+st.set_page_config(
+    page_title="Auto Generate Report Observation", 
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# Custom CSS for a deeper "Black Theme" look
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #0E1117;
+        color: #FFFFFF;
+    }
+    .stButton>button {
+        border-radius: 5px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- CORE LOGIC (Original preserved) ---
 
 def download_and_insert_media(slide, link_data, left_inch, top_inch, width_inch, is_video_slide=False):
@@ -94,8 +114,6 @@ def create_custom_slide(pres, slide_template):
 
 # --- STREAMLIT UI ---
 
-st.set_page_config(page_title="Auto Generate Report Observation", layout="centered")
-
 st.title("📊 Auto Generate Report Observation")
 st.subheader("Sure Stop v1")
 
@@ -128,7 +146,17 @@ st.divider()
 # File Uploader for Excel
 uploaded_excel = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
 
-if st.button("🚀 Generate Report", use_container_width=True):
+# Action Buttons Side by Side
+btn_col1, btn_col2 = st.columns([3, 1])
+
+with btn_col1:
+    generate_btn = st.button("🚀 Generate Report", use_container_width=True)
+
+with btn_col2:
+    if st.button("🔄 Refresh", use_container_width=True):
+        st.rerun()
+
+if generate_btn:
     if not uploaded_excel:
         st.error("Please upload the Excel file.")
     elif not template_exists:
@@ -313,7 +341,8 @@ if st.button("🚀 Generate Report", use_container_width=True):
                     label="📥 Download Presentation",
                     data=ppt_output,
                     file_name=file_name,
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True
                 )
 
         except Exception as e:
