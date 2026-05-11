@@ -109,7 +109,7 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-# --- CORE LOGIC (Original preserved) ---
+# --- CORE LOGIC ---
 
 def download_and_insert_media(slide, link_data, left_inch, top_inch, width_inch, is_video_slide=False):
     if not isinstance(link_data, str) or "drive.google.com" not in link_data:
@@ -190,7 +190,6 @@ def create_custom_slide(pres, slide_template):
 
 # --- STREAMLIT UI INPUTS ---
 
-# AUTOMATIC TEMPLATE CHECK
 TEMPLATE_FILENAME = "template.pptx"
 template_exists = os.path.exists(TEMPLATE_FILENAME)
 
@@ -199,27 +198,24 @@ if not template_exists:
 else:
     st.success(f"STATUS: TEMPLATE LOADED")
 
-# Inputs
 col1, col2 = st.columns(2)
 
 with col1:
     report_title = st.text_input("REPORT TITLE", placeholder="Input Title...")
     obs_month = st.selectbox("OBSERVATION MONTH", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
-    start_date = st.date_input("START DATE", value=datetime(2026, 1, 1))
+    start_date = st.date_input("START DATE", value=datetime(2026, 4, 27))
 
 with col2:
     depot_list = ["MRT Jinjang", "Shah Alam", "Cheras Selatan", "Batu Caves", "MRT Kajang", "MRT Sungai Buloh", "MRT Serdang"]
     selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
     siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
     selected_siri = st.selectbox("SIRI NUMBER", siri_list)
-    end_date = st.date_input("END DATE", value=datetime(2026, 12, 31))
+    end_date = st.date_input("END DATE", value=datetime(2026, 4, 30))
 
 st.divider()
 
-# File Uploader
 uploaded_excel = st.file_uploader("UPLOAD DATA SOURCE (EXCEL)", type=["xlsx", "xls"])
 
-# Action Buttons Side by Side
 btn_col1, btn_col2 = st.columns([3, 1])
 
 with btn_col1:
@@ -318,6 +314,10 @@ if generate_btn:
                     processed_count += 1
                     progress_bar.progress(processed_count / total)
                     status_text.text(f"COMPILING... {processed_count}/{total}")
+
+                # --- UPDATE STATUS TO COMPLETED ---
+                progress_bar.progress(1.0)
+                status_text.text(f"{processed_count}/{total} NOT COMPLY RECORDED - DONE!")
 
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
