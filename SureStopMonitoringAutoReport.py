@@ -12,62 +12,101 @@ import copy
 import time
 from datetime import datetime
 import streamlit as st
-import io
 
-# --- STREAMLIT SETTINGS (Black Theme with Black Text Customization) ---
+# --- STREAMLIT SETTINGS (Neon Green & Black Theme) ---
 st.set_page_config(
     page_title="Auto Generate Report Observation", 
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS: Black background, White Title, but Black text for labels/inputs
+# Custom CSS to match the "Vehicle Details" aesthetic
 st.markdown("""
     <style>
-    /* Main Background */
+    /* Main Background - Very Dark Gray/Black */
     .stApp {
-        background-color: #000000;
+        background-color: #0B0E0F;
     }
     
-    /* Main Title (White) */
-    h1 {
-        color: #FFFFFF !important;
+    /* Header Style from the image */
+    .custom-header {
+        background-color: #111516;
+        border-bottom: 2px solid #00FF66;
+        padding: 15px;
+        border-radius: 8px 8px 0px 0px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
     }
     
-    /* Subheader (White) */
-    h3 {
-        color: #FFFFFF !important;
+    .header-title {
+        color: #00FF66 !important;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 22px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        margin: 0;
     }
 
-    /* All other text/labels (Black) */
-    label, p, span, .stMarkdown {
-        color: #000000 !important;
+    /* Labels - Small, Gray, Uppercase */
+    label, .stMarkdown p {
+        color: #888888 !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        text-transform: uppercase;
+        font-size: 12px !important;
+        font-weight: bold;
     }
 
-    /* Input Backgrounds (White so black text is visible) */
+    /* Input Fields - Dark with Neon Green Text */
     .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
+        background-color: #111516 !important;
+        color: #00FF66 !important;
+        border: 1px solid #333333 !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        border-radius: 4px !important;
     }
     
-    /* Upload Box Text */
-    .stFileUploader section {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
+    /* Success/Error Messages */
+    .stAlert {
+        background-color: #111516 !important;
+        color: #00FF66 !important;
+        border: 1px solid #00FF66 !important;
+    }
+
+    /* Buttons - Neon Green Outline/Solid */
+    .stButton>button {
+        background-color: transparent !important;
+        color: #00FF66 !important;
+        border: 2px solid #00FF66 !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        font-weight: bold !important;
+        transition: 0.3s;
     }
     
-    /* Divider */
+    .stButton>button:hover {
+        background-color: #00FF66 !important;
+        color: #000000 !important;
+    }
+
+    /* Divider color */
     hr {
-        border-color: #333333 !important;
+        border-color: #1A1E1F !important;
     }
-    
-    /* Containers for better contrast */
-    [data-testid="stVerticalBlock"] > div {
-        background-color: #FFFFFF;
-        padding: 10px;
-        border-radius: 10px;
+
+    /* Progress Bar */
+    .stProgress > div > div > div > div {
+        background-color: #00FF66 !important;
     }
     </style>
+    """, unsafe_allow_html=True)
+
+# --- HEADER INJECTION ---
+st.markdown("""
+    <div class="custom-header">
+        <p class="header-title">OBSERVATION DETAILS</p>
+        <span style="color: #FF3366; font-weight: bold; font-family: sans-serif; cursor: pointer;">✕</span>
+    </div>
     """, unsafe_allow_html=True)
 
 # --- CORE LOGIC (Original preserved) ---
@@ -149,98 +188,57 @@ def create_custom_slide(pres, slide_template):
 
     return new_slide
 
-# --- STREAMLIT UI ---
-
-# Custom header mimicking the design template
-st.markdown("""
-<div style="background-color: #111111; padding: 10px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #1a1a1a;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="margin: 0; color: #FFFFFF !important; font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 24px; font-weight: bold;">VEHICLE DETAILS</h1>
-        <div style="color: #FF1A1A; font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 20px; font-weight: bold; cursor: pointer;">✕</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# Custom vehicle data points based on template. We wrap them in styled divs.
-vehicle_info = {
-    "STATUS": "<span style='background-color: #00FF00; color: #000000; padding: 2px 8px; border-radius: 12px; font-weight: bold;'>ONLINE</span>",
-    "ORDERS": "1 DROPOFF",
-    "VEHICLE PLATE": "RAPID217",
-    "DEPOT": "Cheras Selatan",
-    "ZONE": "T640B",
-    "ORIGIN-DESTINATION (OD)": "Taman Medan - Sunway",
-    "DRIVER NAME": "MOHAMMAD SYAFIQ BIN SHUKRI",
-    "STAFF ID": "10023642",
-    "PHONE NUMBER": "+60 189804080",
-    "LAST UPDATE": "3:02 PM (4 min ago)",
-    "SPEED": "0 km/h",
-    "HEADING": "0°",
-    "COORDINATES": "3.066447, 101.635693"
-}
-
-st.markdown("<div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; background-color: #FFFFFF; padding: 15px; border-radius: 10px;'>", unsafe_allow_html=True)
-for label, value in vehicle_info.items():
-    st.markdown(f"""
-        <div>
-            <div style="font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 12px; color: #888888; text-transform: uppercase;">{label}</div>
-            <div style="font-family: 'SF Mono', 'Roboto Mono', monospace; font-size: 16px; color: #00FF00; font-weight: bold; margin-top: 2px;">{value}</div>
-        </div>
-    """, unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
-
-st.divider()
+# --- STREAMLIT UI INPUTS ---
 
 # AUTOMATIC TEMPLATE CHECK
 TEMPLATE_FILENAME = "template.pptx"
 template_exists = os.path.exists(TEMPLATE_FILENAME)
 
 if not template_exists:
-    st.error(f"❌ '{TEMPLATE_FILENAME}' not found in GitHub repository.")
+    st.error(f"STATUS: '{TEMPLATE_FILENAME}' NOT FOUND")
 else:
-    st.success(f"✅ Template '{TEMPLATE_FILENAME}' loaded.")
+    st.success(f"STATUS: TEMPLATE LOADED")
 
 # Inputs
 col1, col2 = st.columns(2)
 
 with col1:
-    report_title = st.text_input("Title", placeholder="e.g., Monthly Observation")
-    obs_month = st.selectbox("Observation Month", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
-    start_date = st.date_input("Start Date", value=datetime(2026, 1, 1))
+    report_title = st.text_input("REPORT TITLE", placeholder="Input Title...")
+    obs_month = st.selectbox("OBSERVATION MONTH", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
+    start_date = st.date_input("START DATE", value=datetime(2026, 1, 1))
 
 with col2:
     depot_list = ["MRT Jinjang", "Shah Alam", "Cheras Selatan", "Batu Caves", "MRT Kajang", "MRT Sungai Buloh", "MRT Serdang"]
-    selected_depot = st.selectbox("Depot", depot_list)
+    selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
     siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
-    selected_siri = st.selectbox("No. Siri", siri_list)
-    end_date = st.date_input("End Date", value=datetime(2026, 12, 31))
+    selected_siri = st.selectbox("SIRI NUMBER", siri_list)
+    end_date = st.date_input("END DATE", value=datetime(2026, 12, 31))
 
 st.divider()
 
-# File Uploader for Excel
-uploaded_excel = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
+# File Uploader
+uploaded_excel = st.file_uploader("UPLOAD DATA SOURCE (EXCEL)", type=["xlsx", "xls"])
 
 # Action Buttons Side by Side
 btn_col1, btn_col2 = st.columns([3, 1])
 
 with btn_col1:
-    generate_btn = st.button("🚀 Generate Report", use_container_width=True)
+    generate_btn = st.button("RUN GENERATOR", use_container_width=True)
 
 with btn_col2:
-    # Fixed Refresh Logic
-    if st.button("🔄 Refresh", use_container_width=True, key="refresh_trigger"):
+    if st.button("REFRESH", use_container_width=True, key="refresh_trigger"):
         st.cache_data.clear()
         st.rerun()
 
+# --- EXECUTION LOGIC ---
 if generate_btn:
     if not uploaded_excel:
-        st.error("Please upload the Excel file.")
+        st.error("ERROR: EXCEL FILE MISSING")
     elif not template_exists:
-        st.error("Cannot proceed: Template file is missing.")
+        st.error("ERROR: TEMPLATE MISSING")
     else:
         try:
             start_time = time.time()
-            
-            # Load Data
             df = pd.read_excel(uploaded_excel, sheet_name='Sheet1')
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
 
@@ -249,7 +247,6 @@ if generate_btn:
                 except: return None
 
             df['cleaned_date'] = df.iloc[:, 0].apply(safe_date_convert)
-            
             mask = (df['cleaned_date'] >= start_date) & \
                    (df['cleaned_date'] <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
@@ -257,10 +254,9 @@ if generate_btn:
             filtered_data = df.loc[mask].copy()
 
             if filtered_data.empty:
-                st.warning(f"No records found for {selected_depot}.")
+                st.warning(f"NO RECORDS FOUND FOR {selected_depot}")
             else:
                 prs = Presentation(TEMPLATE_FILENAME)
-
                 slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
                 slide1_template = prs.slides[0]
                 slide2_template = prs.slides[1]
@@ -270,7 +266,6 @@ if generate_btn:
                 total = len(filtered_data)
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-
                 summary_list = []
 
                 for _, row in filtered_data.iterrows():
@@ -322,7 +317,7 @@ if generate_btn:
 
                     processed_count += 1
                     progress_bar.progress(processed_count / total)
-                    status_text.text(f"Processing... {processed_count}/{total}")
+                    status_text.text(f"COMPILING... {processed_count}/{total}")
 
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
@@ -330,8 +325,6 @@ if generate_btn:
                     if orig_table_shape:
                         height = orig_table_shape.height
                         rows_needed, cols_needed = len(summary_list) + 1, 6
-                        style_id = orig_table_shape.table._tbl.find('.//a:tableStyleId', namespaces=orig_table_shape.table._tbl.nsmap)
-                        style_id_val = style_id.text if style_id is not None else "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
                         new_summary_slide.shapes._spTree.remove(orig_table_shape.element)
                         new_table_shape = new_summary_slide.shapes.add_table(rows_needed, cols_needed, Inches(0.5), Inches(1.5), Inches(9.0), height)
                         summary_table = new_table_shape.table
@@ -344,8 +337,7 @@ if generate_btn:
                             cell = summary_table.rows[0].cells[i]
                             cell.text = h_text
                             for para in cell.text_frame.paragraphs:
-                                for run in para.runs:
-                                    run.font.size = Pt(10); run.font.bold = True
+                                for run in para.runs: run.font.size = Pt(10); run.font.bold = True
 
                         for idx, s_row in enumerate(summary_list):
                             tr = summary_table.rows[idx + 1]
@@ -358,25 +350,19 @@ if generate_btn:
                                 for para in cell.text_frame.paragraphs:
                                     for run in para.runs: run.font.size = Pt(8); run.font.name = "Arial"
 
-                if slide6_template:
-                    create_custom_slide(prs, slide6_template)
+                if slide6_template: create_custom_slide(prs, slide6_template)
 
-                # Slide Reordering Logic
+                # Reordering & Replacing Title
                 xml_slides = prs.slides._sldIdLst
                 for _ in range(3): xml_slides.remove(xml_slides[0])
                 if len(prs.slides) >= 3:
                     summary_slide_element = xml_slides[len(xml_slides) - 2]
-                    xml_slides.remove(summary_slide_element)
-                    xml_slides.insert(2, summary_slide_element)
+                    xml_slides.remove(summary_slide_element); xml_slides.insert(2, summary_slide_element)
                     slide_two_element = xml_slides[1]
-                    xml_slides.remove(slide_two_element)
-                    xml_slides.insert(0, slide_two_element)
+                    xml_slides.remove(slide_two_element); xml_slides.insert(0, slide_two_element)
                 if len(xml_slides) >= 4: xml_slides.remove(xml_slides[3])
 
-                # Text replacements
-                current_year = datetime.now().year
-                full_replacement_text = f"Central Region {obs_month} {current_year}"
-
+                full_replacement_text = f"Central Region {obs_month} {datetime.now().year}"
                 for slide in prs.slides:
                     for shape in slide.shapes:
                         if shape.has_text_frame:
@@ -384,10 +370,7 @@ if generate_btn:
                                 for paragraph in shape.text_frame.paragraphs:
                                     if "Januari-February 2026" in paragraph.text:
                                         paragraph.text = paragraph.text.replace("Januari-February 2026", full_replacement_text)
-                                        for run in paragraph.runs:
-                                            run.font.name = 'Arial'; run.font.size = Pt(20)
-                                            run.font.color.rgb = RGBColor(0, 32, 96)
-                            
+                                        for run in paragraph.runs: run.font.name = 'Arial'; run.font.size = Pt(20); run.font.color.rgb = RGBColor(0, 32, 96)
                             if "OE/SQI/CR/VO/001/2026" in shape.text_frame.text:
                                 for paragraph in shape.text_frame.paragraphs:
                                     if "OE/SQI/CR/VO/001/2026" in paragraph.text:
@@ -399,15 +382,14 @@ if generate_btn:
                 ppt_output.seek(0)
                 
                 duration = time.time() - start_time
-                st.success(f"Done! ({int(duration // 60)}m {int(duration % 60)}s)")
+                st.success(f"COMPLETE: {int(duration // 60)}M {int(duration % 60)}S")
                 
                 st.download_button(
-                    label="📥 Download Presentation",
+                    label="DOWNLOAD GENERATED PPTX",
                     data=ppt_output,
                     file_name=f"{report_title if report_title else 'Report'}.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True
                 )
-
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f"SYSTEM ERROR: {str(e)}")
