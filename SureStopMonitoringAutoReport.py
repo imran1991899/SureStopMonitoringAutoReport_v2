@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 import streamlit as st
 
-# --- STREAMLIT SETTINGS (Neon Green & Black Theme) ---
+# --- STREAMLIT SETTINGS ---
 st.set_page_config(
     page_title="Auto Generate Report Observation", 
     layout="centered",
@@ -182,15 +182,15 @@ if generate_btn:
             start_time = time.time()
             df = pd.read_csv(CSV_URL)
             
-            # Convert first column to datetime objects
+            # 1. Convert timestamp to datetime objects
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
             
-            # Filtering
+            # 2. Filter data
             mask = (df.iloc[:, 0].dt.date >= start_date) & \
                    (df.iloc[:, 0].dt.date <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
 
-            filtered_data = df.loc[mask].copy()
+            filtered_data = df.loc[mask].reset_index(drop=True)
 
             if filtered_data.empty:
                 st.warning(f"NO RECORDS FOUND FOR {selected_depot}")
@@ -203,21 +203,23 @@ if generate_btn:
                 progress_bar, status_text = st.progress(0), st.empty()
                 summary_list = []
 
-                for i in range(len(filtered_data)):
-                    # Extract single row
-                    row = filtered_data.iloc[i]
+                for idx in range(total):
+                    # Access data using .at to ensure single value extraction, not a Series
+                    row_timestamp = filtered_data.iloc[idx, 0]
+                    comply_status = str(filtered_data.iloc[idx, 8]).strip().lower()
+
+                    if comply_status == "yes": continue
                     
-                    if str(row.iloc[8]).strip().lower() == "yes": continue
-                    summary_list.append(row)
-                    
+                    summary_list.append(filtered_data.iloc[idx])
                     new_slide = create_custom_slide(prs, slide1_template)
                     
-                    # Extract single timestamp value correctly
-                    dt_val = row.iloc[0]
-                    date_str = dt_val.strftime('%d/%m/%Y') if pd.notnull(dt_val) else "N/A"
-                    time_str = dt_val.strftime('%H:%M:%S') if pd.notnull(dt_val) else "N/A"
+                    # Convert single timestamp to strings
+                    date_str = row_timestamp.strftime('%d/%m/%Y') if pd.notnull(row_timestamp) else "N/A"
+                    time_str = row_timestamp.strftime('%H:%M:%S') if pd.notnull(row_timestamp) else "N/A"
 
-                    c_i, c_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
+                    c_i = str(filtered_data.iloc[idx, 8]).lower()
+                    c_j = str(filtered_data.iloc[idx, 9]).lower()
+                    
                     pemerhatian = ("1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n" if c_i == "no" else "") + \
                                   ("2. Kapten Bas tidak memandu / menggunakan lorong kiri" if c_j == "no" else "")
                     
@@ -226,13 +228,18 @@ if generate_btn:
                     elif c_i == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas."
                     elif c_j == "no": cadangan = "2. Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri."
 
-                    # Create strings for replacement
+                    # CRITICAL FIX: Every replacement value is forced to str()
                     reps = {
-                        "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}", "Nombor Bas :": f"Nombor Bas : {str(row.iloc[6])}",
-                        "Laluan pemerhatian :": f"Laluan pemerhatian : {str(row.iloc[4])}", "Masa :": f"Masa : {time_str}",
-                        "Lokasi / Hentian :": f"Lokasi / Hentian : {str(row.iloc[5])}", "Nama Kapten Bas :": f"Nama Kapten Bas : {str(row.iloc[32])}",
-                        "ID Kapten Bas :": f"ID Kapten Bas : {str(row.iloc[31])}", "Kelajuan Dipandu :": f"Kelajuan Dipandu : {str(row.iloc[30])} Km/h",
-                        "Nama PIC :": f"Nama PIC : {str(row.iloc[2])}", "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
+                        "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
+                        "Nombor Bas :": f"Nombor Bas : {str(filtered_data.iloc[idx, 6])}",
+                        "Laluan pemerhatian :": f"Laluan pemerhatian : {str(filtered_data.iloc[idx, 4])}",
+                        "Masa :": f"Masa : {time_str}",
+                        "Lokasi / Hentian :": f"Lokasi / Hentian : {str(filtered_data.iloc[idx, 5])}",
+                        "Nama Kapten Bas :": f"Nama Kapten Bas : {str(filtered_data.iloc[idx, 32])}",
+                        "ID Kapten Bas :": f"ID Kapten Bas : {str(filtered_data.iloc[idx, 31])}",
+                        "Kelajuan Dipandu :": f"Kelajuan Dipandu : {str(filtered_data.iloc[idx, 30])} Km/h",
+                        "Nama PIC :": f"Nama PIC : {str(filtered_data.iloc[idx, 2])}",
+                        "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
                         "Cadangan:": f"Cadangan:\n{cadangan}"
                     }
 
@@ -246,16 +253,16 @@ if generate_btn:
                                                 para.text = para.text.replace(k, v)
                                                 for run in para.runs: run.font.size = Pt(10)
 
-                    download_and_insert_media(new_slide, row.iloc[26], 0.6, 2.1, 3.8)
+                    download_and_insert_media(new_slide, str(filtered_data.iloc[idx, 26]), 0.6, 2.1, 3.8)
                     v_slide = create_custom_slide(prs, slide2_template)
-                    download_and_insert_media(v_slide, row.iloc[26], 0, 0, 0, True)
+                    download_and_insert_media(v_slide, str(filtered_data.iloc[idx, 26]), 0, 0, 0, True)
 
                     processed_count += 1
                     progress_bar.progress(processed_count / total)
                     status_text.text(f"COMPILING... {processed_count}/{total}")
 
                 progress_bar.progress(1.0)
-                status_text.text(f"DONE!")
+                status_text.text(f"GENERATION DONE!")
 
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
@@ -271,7 +278,7 @@ if generate_btn:
                         for idx, s_row in enumerate(summary_list):
                             tr = new_table.rows[idx+1]
                             tr.cells[0].text, tr.cells[1].text, tr.cells[2].text, tr.cells[3].text = str(s_row.iloc[3]), str(s_row.iloc[4]), str(s_row.iloc[6]), str(s_row.iloc[5])
-                            tr.cells[4].text = f"ID: {s_row.iloc[31]}\nNama: {s_row.iloc[32]}\nLaju: {s_row.iloc[30]} Km/h\nMasa: {pd.to_datetime(s_row.iloc[0]).strftime('%d/%m/%Y %H:%M:%S')}"
+                            tr.cells[4].text = f"ID: {s_row.iloc[31]}\nNama: {s_row.iloc[32]}\nLaju: {s_row.iloc[30]} Km/h\nMasa: {s_row.iloc[0].strftime('%d/%m/%Y %H:%M:%S')}"
                             tr.cells[5].text = "Tidak Mematuhi"
                             for cell in tr.cells:
                                 for p in cell.text_frame.paragraphs:
@@ -279,7 +286,7 @@ if generate_btn:
 
                 if slide6_template: create_custom_slide(prs, slide6_template)
 
-                # Reordering
+                # Reordering logic
                 xml_slides = prs.slides._sldIdLst
                 for _ in range(3): xml_slides.remove(xml_slides[0])
                 if len(prs.slides) >= 3:
