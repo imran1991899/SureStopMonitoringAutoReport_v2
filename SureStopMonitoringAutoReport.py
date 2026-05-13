@@ -219,8 +219,22 @@ with col2:
 
 st.divider()
 
-# New Sync Button Logic
-if st.button("🔄 SYNC FROM GOOGLE SHEETS"):
+# --- UNIFORM BUTTON LEVEL ---
+# Ratio 1:1:2 ensures Run Generator is twice as wide as the others
+act_col1, act_col2, act_col3 = st.columns([1, 1, 2])
+
+with act_col1:
+    sync_btn = st.button("🔄 SYNC FROM GSHEET", use_container_width=True)
+
+with act_col2:
+    refresh_btn = st.button("REFRESH", use_container_width=True, key="refresh_trigger")
+
+with act_col3:
+    generate_btn = st.button("RUN GENERATOR", use_container_width=True)
+
+
+# --- BUTTON LOGIC HANDLERS ---
+if sync_btn:
     try:
         response = requests.get(EXPORT_URL, timeout=30)
         if response.status_code == 200:
@@ -231,17 +245,11 @@ if st.button("🔄 SYNC FROM GOOGLE SHEETS"):
     except Exception as e:
         st.error(f"SYNC ERROR: {e}")
 
-btn_col1, btn_col2 = st.columns([3, 1])
-
-with btn_col1:
-    generate_btn = st.button("RUN GENERATOR", use_container_width=True)
-
-with btn_col2:
-    if st.button("REFRESH", use_container_width=True, key="refresh_trigger"):
-        if 'synced_data' in st.session_state:
-            del st.session_state.synced_data
-        st.cache_data.clear()
-        st.rerun()
+if refresh_btn:
+    if 'synced_data' in st.session_state:
+        del st.session_state.synced_data
+    st.cache_data.clear()
+    st.rerun()
 
 # --- EXECUTION LOGIC ---
 if generate_btn:
@@ -249,7 +257,7 @@ if generate_btn:
     df = st.session_state.get('synced_data')
         
     if df is None:
-        st.error("ERROR: PLEASE CLICK 'SYNC FROM GOOGLE SHEETS' FIRST")
+        st.error("ERROR: PLEASE CLICK 'SYNC FROM GSHEET' FIRST")
     elif not template_exists:
         st.error("ERROR: TEMPLATE MISSING")
     else:
