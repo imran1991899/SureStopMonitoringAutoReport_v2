@@ -159,7 +159,6 @@ st.divider()
 
 # --- GOOGLE SHEET EXCEL DOWNLOAD ---
 SHEET_ID = "1qlPsPPRKMTfoyMN0MmzK3Hu9wxiBFjYIX6IFMbriZmo"
-# Exporting as .xlsx instead of .csv
 EXCEL_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
 
 btn_col1, btn_col2 = st.columns([3, 1])
@@ -168,11 +167,9 @@ with btn_col2:
     if st.button("SYNC EXCEL", use_container_width=True):
         try:
             resp = requests.get(EXCEL_URL)
-            with open(LOCAL_EXCEL_FILE, "wb") as f:
-                f.write(resp.content)
+            with open(LOCAL_EXCEL_FILE, "wb") as f: f.write(resp.content)
             st.toast("EXCEL FILE UPDATED FROM GSHEET!", icon="✅")
-        except Exception as e:
-            st.error(f"SYNC FAILED: {e}")
+        except Exception as e: st.error(f"SYNC FAILED: {e}")
 
 # --- EXECUTION ---
 if generate_btn:
@@ -181,16 +178,18 @@ if generate_btn:
     else:
         try:
             start_time = time.time()
-            
-            # Download fresh file every run if not exists
             if not os.path.exists(LOCAL_EXCEL_FILE):
                 resp = requests.get(EXCEL_URL)
                 with open(LOCAL_EXCEL_FILE, "wb") as f: f.write(resp.content)
 
-            # Read from the Local Excel File
             df = pd.read_excel(LOCAL_EXCEL_FILE)
             
+            # --- FIX: Ensure first column is explicitly converted to Datetime ---
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
+            # Remove any rows where the timestamp could not be parsed
+            df = df.dropna(subset=[df.columns[0]])
+            
+            # 2. Filter data
             mask = (df.iloc[:, 0].dt.date >= start_date) & \
                    (df.iloc[:, 0].dt.date <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
@@ -201,9 +200,7 @@ if generate_btn:
                 st.warning(f"NO RECORDS FOUND FOR {selected_depot}")
             else:
                 prs = Presentation(TEMPLATE_FILENAME)
-                slide1_template = prs.slides[0]
-                slide2_template = prs.slides[1]
-                slide3_template = prs.slides[2]
+                slide1_template, slide2_template, slide3_template = prs.slides[0], prs.slides[1], prs.slides[2]
                 slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
 
                 processed_count, total = 0, len(filtered_data)
@@ -262,7 +259,6 @@ if generate_btn:
                     progress_bar.progress(processed_count / total)
                     status_text.text(f"COMPILING... {processed_count}/{total}")
 
-                # --- SUMMARY AND REORDERING ---
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
                     orig = next((s for s in new_summary_slide.shapes if s.has_table), None)
@@ -281,7 +277,7 @@ if generate_btn:
 
                 if slide6_template: create_custom_slide(prs, slide6_template)
 
-                # Final Reorder
+                # Final Reorder logic
                 xml_slides = prs.slides._sldIdLst
                 for _ in range(3): xml_slides.remove(xml_slides[0])
                 
