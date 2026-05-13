@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS
+# Custom CSS for Neon Green & Black Theme
 st.markdown("""
     <style>
     .stApp { background-color: #0B0E0F; }
@@ -56,11 +56,6 @@ st.markdown("""
         font-family: 'Courier New', Courier, monospace !important;
         border-radius: 4px !important;
     }
-    .stAlert {
-        background-color: #111516 !important;
-        color: #00FF66 !important;
-        border: 1px solid #00FF66 !important;
-    }
     .stButton>button {
         background-color: transparent !important;
         color: #00FF66 !important;
@@ -73,7 +68,6 @@ st.markdown("""
         background-color: #00FF66 !important;
         color: #000000 !important;
     }
-    hr { border-color: #1A1E1F !important; }
     .stProgress > div > div > div > div { background-color: #00FF66 !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -145,6 +139,8 @@ def create_custom_slide(pres, slide_template):
 
 # --- UI INPUTS ---
 TEMPLATE_FILENAME = "template.pptx"
+LOCAL_EXCEL_FILE = "latest_gsheet_data.xlsx"
+
 template_exists = os.path.exists(TEMPLATE_FILENAME)
 if not template_exists: st.error(f"STATUS: '{TEMPLATE_FILENAME}' NOT FOUND")
 else: st.success(f"STATUS: TEMPLATE LOADED")
@@ -161,17 +157,22 @@ with col2:
 
 st.divider()
 
-# GOOGLE SHEET SOURCE
+# --- GOOGLE SHEET EXCEL DOWNLOAD ---
 SHEET_ID = "1qlPsPPRKMTfoyMN0MmzK3Hu9wxiBFjYIX6IFMbriZmo"
-GID = "40024720"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
+# Exporting as .xlsx instead of .csv
+EXCEL_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
 
 btn_col1, btn_col2 = st.columns([3, 1])
 with btn_col1: generate_btn = st.button("RUN GENERATOR", use_container_width=True)
 with btn_col2:
-    if st.button("REFRESH", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+    if st.button("SYNC EXCEL", use_container_width=True):
+        try:
+            resp = requests.get(EXCEL_URL)
+            with open(LOCAL_EXCEL_FILE, "wb") as f:
+                f.write(resp.content)
+            st.toast("EXCEL FILE UPDATED FROM GSHEET!", icon="✅")
+        except Exception as e:
+            st.error(f"SYNC FAILED: {e}")
 
 # --- EXECUTION ---
 if generate_btn:
@@ -180,12 +181,16 @@ if generate_btn:
     else:
         try:
             start_time = time.time()
-            df = pd.read_csv(CSV_URL)
             
-            # 1. Convert timestamp to datetime objects
+            # Download fresh file every run if not exists
+            if not os.path.exists(LOCAL_EXCEL_FILE):
+                resp = requests.get(EXCEL_URL)
+                with open(LOCAL_EXCEL_FILE, "wb") as f: f.write(resp.content)
+
+            # Read from the Local Excel File
+            df = pd.read_excel(LOCAL_EXCEL_FILE)
+            
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
-            
-            # 2. Filter data
             mask = (df.iloc[:, 0].dt.date >= start_date) & \
                    (df.iloc[:, 0].dt.date <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
@@ -196,7 +201,9 @@ if generate_btn:
                 st.warning(f"NO RECORDS FOUND FOR {selected_depot}")
             else:
                 prs = Presentation(TEMPLATE_FILENAME)
-                slide1_template, slide2_template, slide3_template = prs.slides[0], prs.slides[1], prs.slides[2]
+                slide1_template = prs.slides[0]
+                slide2_template = prs.slides[1]
+                slide3_template = prs.slides[2]
                 slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
 
                 processed_count, total = 0, len(filtered_data)
@@ -204,22 +211,17 @@ if generate_btn:
                 summary_list = []
 
                 for idx in range(total):
-                    # Access data using .at to ensure single value extraction, not a Series
-                    row_timestamp = filtered_data.iloc[idx, 0]
-                    comply_status = str(filtered_data.iloc[idx, 8]).strip().lower()
-
-                    if comply_status == "yes": continue
+                    row = filtered_data.iloc[idx]
+                    if str(row.iloc[8]).strip().lower() == "yes": continue
                     
-                    summary_list.append(filtered_data.iloc[idx])
+                    summary_list.append(row)
                     new_slide = create_custom_slide(prs, slide1_template)
                     
-                    # Convert single timestamp to strings
-                    date_str = row_timestamp.strftime('%d/%m/%Y') if pd.notnull(row_timestamp) else "N/A"
-                    time_str = row_timestamp.strftime('%H:%M:%S') if pd.notnull(row_timestamp) else "N/A"
+                    dt_val = row.iloc[0]
+                    date_str = dt_val.strftime('%d/%m/%Y') if pd.notnull(dt_val) else "N/A"
+                    time_str = dt_val.strftime('%H:%M:%S') if pd.notnull(dt_val) else "N/A"
 
-                    c_i = str(filtered_data.iloc[idx, 8]).lower()
-                    c_j = str(filtered_data.iloc[idx, 9]).lower()
-                    
+                    c_i, c_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
                     pemerhatian = ("1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n" if c_i == "no" else "") + \
                                   ("2. Kapten Bas tidak memandu / menggunakan lorong kiri" if c_j == "no" else "")
                     
@@ -228,17 +230,16 @@ if generate_btn:
                     elif c_i == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas."
                     elif c_j == "no": cadangan = "2. Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri."
 
-                    # CRITICAL FIX: Every replacement value is forced to str()
                     reps = {
                         "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
-                        "Nombor Bas :": f"Nombor Bas : {str(filtered_data.iloc[idx, 6])}",
-                        "Laluan pemerhatian :": f"Laluan pemerhatian : {str(filtered_data.iloc[idx, 4])}",
+                        "Nombor Bas :": f"Nombor Bas : {str(row.iloc[6])}",
+                        "Laluan pemerhatian :": f"Laluan pemerhatian : {str(row.iloc[4])}",
                         "Masa :": f"Masa : {time_str}",
-                        "Lokasi / Hentian :": f"Lokasi / Hentian : {str(filtered_data.iloc[idx, 5])}",
-                        "Nama Kapten Bas :": f"Nama Kapten Bas : {str(filtered_data.iloc[idx, 32])}",
-                        "ID Kapten Bas :": f"ID Kapten Bas : {str(filtered_data.iloc[idx, 31])}",
-                        "Kelajuan Dipandu :": f"Kelajuan Dipandu : {str(filtered_data.iloc[idx, 30])} Km/h",
-                        "Nama PIC :": f"Nama PIC : {str(filtered_data.iloc[idx, 2])}",
+                        "Lokasi / Hentian :": f"Lokasi / Hentian : {str(row.iloc[5])}",
+                        "Nama Kapten Bas :": f"Nama Kapten Bas : {str(row.iloc[32])}",
+                        "ID Kapten Bas :": f"ID Kapten Bas : {str(row.iloc[31])}",
+                        "Kelajuan Dipandu :": f"Kelajuan Dipandu : {str(row.iloc[30])} Km/h",
+                        "Nama PIC :": f"Nama PIC : {str(row.iloc[2])}",
                         "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
                         "Cadangan:": f"Cadangan:\n{cadangan}"
                     }
@@ -250,20 +251,18 @@ if generate_btn:
                                     for para in cell.text_frame.paragraphs:
                                         for k, v in reps.items():
                                             if k in para.text:
-                                                para.text = para.text.replace(k, v)
+                                                para.text = para.text.replace(k, str(v))
                                                 for run in para.runs: run.font.size = Pt(10)
 
-                    download_and_insert_media(new_slide, str(filtered_data.iloc[idx, 26]), 0.6, 2.1, 3.8)
+                    download_and_insert_media(new_slide, str(row.iloc[26]), 0.6, 2.1, 3.8)
                     v_slide = create_custom_slide(prs, slide2_template)
-                    download_and_insert_media(v_slide, str(filtered_data.iloc[idx, 26]), 0, 0, 0, True)
+                    download_and_insert_media(v_slide, str(row.iloc[26]), 0, 0, 0, True)
 
                     processed_count += 1
                     progress_bar.progress(processed_count / total)
                     status_text.text(f"COMPILING... {processed_count}/{total}")
 
-                progress_bar.progress(1.0)
-                status_text.text(f"GENERATION DONE!")
-
+                # --- SUMMARY AND REORDERING ---
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
                     orig = next((s for s in new_summary_slide.shapes if s.has_table), None)
@@ -273,47 +272,22 @@ if generate_btn:
                         headers = ["Depoh", "Laluan", "Nombor Bas", "Hentian Bas", "Pengesahan", "Status"]
                         for i, h in enumerate(headers): 
                             new_table.rows[0].cells[i].text = h
-                            for p in new_table.rows[0].cells[i].text_frame.paragraphs:
-                                for r in p.runs: r.font.size, r.font.bold = Pt(10), True
                         for idx, s_row in enumerate(summary_list):
                             tr = new_table.rows[idx+1]
-                            tr.cells[0].text, tr.cells[1].text, tr.cells[2].text, tr.cells[3].text = str(s_row.iloc[3]), str(s_row.iloc[4]), str(s_row.iloc[6]), str(s_row.iloc[5])
-                            tr.cells[4].text = f"ID: {s_row.iloc[31]}\nNama: {s_row.iloc[32]}\nLaju: {s_row.iloc[30]} Km/h\nMasa: {s_row.iloc[0].strftime('%d/%m/%Y %H:%M:%S')}"
+                            tr.cells[0].text, tr.cells[1].text = str(s_row.iloc[3]), str(s_row.iloc[4])
+                            tr.cells[2].text, tr.cells[3].text = str(s_row.iloc[6]), str(s_row.iloc[5])
+                            tr.cells[4].text = f"ID: {s_row.iloc[31]}\nLaju: {s_row.iloc[30]} Km/h"
                             tr.cells[5].text = "Tidak Mematuhi"
-                            for cell in tr.cells:
-                                for p in cell.text_frame.paragraphs:
-                                    for r in p.runs: r.font.size, r.font.name = Pt(8), "Arial"
 
                 if slide6_template: create_custom_slide(prs, slide6_template)
 
-                # Reordering logic
+                # Final Reorder
                 xml_slides = prs.slides._sldIdLst
                 for _ in range(3): xml_slides.remove(xml_slides[0])
-                if len(prs.slides) >= 3:
-                    summ_el = xml_slides[len(xml_slides)-2]
-                    xml_slides.remove(summ_el); xml_slides.insert(2, summ_el)
-                    s2_el = xml_slides[1]
-                    xml_slides.remove(s2_el); xml_slides.insert(0, s2_el)
-                if len(xml_slides) >= 4: xml_slides.remove(xml_slides[3])
-
-                full_title = f"Central Region {obs_month} {datetime.now().year}"
-                for slide in prs.slides:
-                    for shape in slide.shapes:
-                        if shape.has_text_frame:
-                            if "Januari-February 2026" in shape.text_frame.text:
-                                for p in shape.text_frame.paragraphs:
-                                    if "Januari-February 2026" in p.text:
-                                        p.text = p.text.replace("Januari-February 2026", full_title)
-                                        for r in p.runs: r.font.name, r.font.size, r.font.color.rgb = 'Arial', Pt(20), RGBColor(0,32,96)
-                            if "OE/SQI/CR/VO/001/2026" in shape.text_frame.text:
-                                for p in shape.text_frame.paragraphs:
-                                    if "OE/SQI/CR/VO/001/2026" in p.text:
-                                        p.text = p.text.replace("OE/SQI/CR/VO/001/2026", selected_siri)
-                                        for r in p.runs: r.font.size = Pt(12)
-
+                
                 ppt_out = io.BytesIO()
                 prs.save(ppt_out)
                 ppt_out.seek(0)
-                st.success(f"COMPLETE: {int((time.time()-start_time)//60)}M {int((time.time()-start_time)%60)}S")
-                st.download_button("DOWNLOAD GENERATED PPTX", ppt_out, f"{report_title or 'Report'}.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
+                st.success(f"COMPLETE: {int((time.time()-start_time)//60)}M")
+                st.download_button("DOWNLOAD REPORT", ppt_out, f"{report_title}.pptx", use_container_width=True)
         except Exception as e: st.error(f"SYSTEM ERROR: {str(e)}")
