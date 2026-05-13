@@ -180,15 +180,15 @@ if generate_btn:
     else:
         try:
             start_time = time.time()
-            # Fetch data
             df = pd.read_csv(CSV_URL)
             
-            # Use original date format directly
+            # Convert first column to datetime and extract date for masking
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
+            df_dates = df.iloc[:, 0].dt.date
             
-            # Simple Filter without format modification
-            mask = (df.iloc[:, 0].dt.date >= start_date) & \
-                   (df.iloc[:, 0].dt.date <= end_date) & \
+            # Filtering
+            mask = (df_dates >= start_date) & \
+                   (df_dates <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
 
             filtered_data = df.loc[mask].copy()
@@ -209,9 +209,10 @@ if generate_btn:
                     summary_list.append(row)
                     new_slide = create_custom_slide(prs, slide1_template)
                     
-                    dt_raw = row.iloc[0]
-                    date_str = dt_raw.strftime('%d/%m/%Y') if not pd.isnull(dt_raw) else "N/A"
-                    time_str = dt_raw.strftime('%H:%M:%S') if not pd.isnull(dt_raw) else "N/A"
+                    # Robust timestamp string extraction
+                    dt_val = row.iloc[0]
+                    date_str = dt_val.strftime('%d/%m/%Y') if pd.notnull(dt_val) else "N/A"
+                    time_str = dt_val.strftime('%H:%M:%S') if pd.notnull(dt_val) else "N/A"
 
                     c_i, c_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
                     pemerhatian = ("1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n" if c_i == "no" else "") + \
