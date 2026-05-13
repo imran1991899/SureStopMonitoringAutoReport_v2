@@ -157,7 +157,7 @@ with col2:
 
 st.divider()
 
-# --- GOOGLE SHEET EXCEL DOWNLOAD ---
+# --- GSHEET EXCEL DOWNLOAD ---
 SHEET_ID = "1qlPsPPRKMTfoyMN0MmzK3Hu9wxiBFjYIX6IFMbriZmo"
 EXCEL_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
 
@@ -182,14 +182,23 @@ if generate_btn:
                 resp = requests.get(EXCEL_URL)
                 with open(LOCAL_EXCEL_FILE, "wb") as f: f.write(resp.content)
 
+            # Load Excel
             df = pd.read_excel(LOCAL_EXCEL_FILE)
             
-            # --- FIX: Ensure first column is explicitly converted to Datetime ---
+            # --- CRITICAL FIX START ---
+            # 1. Force the first column to be Datetime. 'coerce' turns errors into NaT (Not a Time)
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
-            # Remove any rows where the timestamp could not be parsed
+            
+            # 2. Clean the data: Drop rows where the first column is NaT (empty rows or text headers)
             df = df.dropna(subset=[df.columns[0]])
             
-            # 2. Filter data
+            # 3. Double-check: If still not datetimelike, stop here
+            if not pd.api.types.is_datetime64_any_dtype(df.iloc[:, 0]):
+                st.error("Column A contains non-date values that cannot be converted.")
+                st.stop()
+            # --- CRITICAL FIX END ---
+
+            # Filter data
             mask = (df.iloc[:, 0].dt.date >= start_date) & \
                    (df.iloc[:, 0].dt.date <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
