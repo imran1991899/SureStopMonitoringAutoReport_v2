@@ -219,9 +219,6 @@ with col2:
 
 st.divider()
 
-# Original Manual File Uploader
-uploaded_excel = st.file_uploader("UPLOAD DATA SOURCE (EXCEL)", type=["xlsx", "xls"])
-
 # New Sync Button Logic
 if st.button("🔄 SYNC FROM GOOGLE SHEETS"):
     try:
@@ -248,15 +245,11 @@ with btn_col2:
 
 # --- EXECUTION LOGIC ---
 if generate_btn:
-    # Logic to pick between manual upload or synced data
-    df = None
-    if uploaded_excel:
-        df = pd.read_excel(uploaded_excel, sheet_name=SHEET_NAME)
-    elif 'synced_data' in st.session_state:
-        df = st.session_state.synced_data
+    # Always pull from synced data now
+    df = st.session_state.get('synced_data')
         
     if df is None:
-        st.error("ERROR: DATA SOURCE MISSING (PLEASE UPLOAD OR SYNC)")
+        st.error("ERROR: PLEASE CLICK 'SYNC FROM GOOGLE SHEETS' FIRST")
     elif not template_exists:
         st.error("ERROR: TEMPLATE MISSING")
     else:
