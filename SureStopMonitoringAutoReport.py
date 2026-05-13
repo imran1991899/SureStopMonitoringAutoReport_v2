@@ -224,7 +224,7 @@ st.divider()
 act_col1, act_col2, act_col3 = st.columns([1, 1, 2])
 
 with act_col1:
-    sync_btn = st.button("🔄 SYNC FROM GSHEET", use_container_width=True)
+    sync_btn = st.button("🔄 Update GSheet", use_container_width=True)
 
 with act_col2:
     refresh_btn = st.button("REFRESH", use_container_width=True, key="refresh_trigger")
