@@ -180,17 +180,15 @@ if generate_btn:
     else:
         try:
             start_time = time.time()
-            # FIXED: Read CSV and handle datetime properly
+            # Fetch data
             df = pd.read_csv(CSV_URL)
-            # Ensure the first column is converted to datetime objects
+            
+            # Use original date format directly
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
             
-            # Create a clean date-only column for filtering
-            df['cleaned_date'] = df.iloc[:, 0].dt.date
-            
-            # Ensure UI inputs are also date objects for the comparison
-            mask = (df['cleaned_date'] >= start_date) & \
-                   (df['cleaned_date'] <= end_date) & \
+            # Simple Filter without format modification
+            mask = (df.iloc[:, 0].dt.date >= start_date) & \
+                   (df.iloc[:, 0].dt.date <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
 
             filtered_data = df.loc[mask].copy()
@@ -210,7 +208,8 @@ if generate_btn:
                     if str(row.iloc[8]).strip().lower() == "yes": continue
                     summary_list.append(row)
                     new_slide = create_custom_slide(prs, slide1_template)
-                    dt_raw = pd.to_datetime(row.iloc[0])
+                    
+                    dt_raw = row.iloc[0]
                     date_str = dt_raw.strftime('%d/%m/%Y') if not pd.isnull(dt_raw) else "N/A"
                     time_str = dt_raw.strftime('%H:%M:%S') if not pd.isnull(dt_raw) else "N/A"
 
