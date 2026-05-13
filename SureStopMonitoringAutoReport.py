@@ -161,7 +161,7 @@ with col2:
 
 st.divider()
 
-# HIDDEN GOOGLE SHEET SOURCE
+# GOOGLE SHEET SOURCE
 SHEET_ID = "1qlPsPPRKMTfoyMN0MmzK3Hu9wxiBFjYIX6IFMbriZmo"
 GID = "40024720"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
@@ -180,11 +180,15 @@ if generate_btn:
     else:
         try:
             start_time = time.time()
-            # Fetch data from Google Sheet link
+            # FIXED: Read CSV and handle datetime properly
             df = pd.read_csv(CSV_URL)
+            # Ensure the first column is converted to datetime objects
             df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
             
+            # Create a clean date-only column for filtering
             df['cleaned_date'] = df.iloc[:, 0].dt.date
+            
+            # Ensure UI inputs are also date objects for the comparison
             mask = (df['cleaned_date'] >= start_date) & \
                    (df['cleaned_date'] <= end_date) & \
                    (df.iloc[:, 3].astype(str).str.strip() == selected_depot)
