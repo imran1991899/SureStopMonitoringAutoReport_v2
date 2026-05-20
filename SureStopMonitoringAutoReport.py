@@ -211,7 +211,7 @@ with col1:
     start_date = st.date_input("START DATE", value=datetime(2026, 4, 27))
 
 with col2:
-    depot_list = ["MRT Jinjang", "Shah Alam", "Cheras Selatan", "Batu Caves", "MRT Kajang", "MRT Sungai Buloh", "MRT Serdang"]
+    depot_list = ["(OS) Batu Caves",	"(OS) Cheras Selatan",	"(OS) Maluri",	"(OS) Shah Alam",	"(SAL) Sungai Buloh",	"Asia Jaya",	"Balik Pulau",	"Batu Caves",	"BRT Sunway",	"Cheras Selatan",	"Kamunting",	"Kepong",	"Mak Mandin",	"Maluri",	"Melawati",	"MRT Jinjang",	"MRT Kajang",	"MRT Serdang",	"MRT Sungai Buloh",	"Nibong Tebal",	"Putrajaya",	"Sentul",	"Shah Alam",	"Sungai Nibong",	"Tanjung Bungah",	"Weld Quay"]
     selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
     siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
     selected_siri = st.selectbox("SIRI NUMBER", siri_list)
