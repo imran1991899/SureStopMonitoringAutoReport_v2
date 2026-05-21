@@ -458,22 +458,19 @@ if generate_btn:
                 region_name = "Northern Region" if is_northern else "Central Region"
                 full_replacement_text = f"{region_name} {obs_month} {datetime.now().year}"
                 
-                # Setup strings for matching and dynamic swapping of regional managers
-                cr_manager_block = "Mohd Shahfiee Abdullah\u200b\nAssistant Manager,\u200b\u200b\nQuality Improvement Central Region\u200b\nService Quality & Innovation,\u200b\u200b\nOperational Excellence"
-                nr_manager_block = "Miran Nursyawalni Amir\nAssistant Manager,\u200b\u200b\nQuality Improvement Northern Region\u200b\nService Quality & Innovation,\u200b\u200b\nOperational Excellence"
+                # Setup standard structure text blocks
+                nr_manager_block = "Miran Nursyawalni Amir\nAssistant Manager,\nQuality Improvement Northern Region\nService Quality & Innovation,\nOperational Excellence"
 
                 for slide in prs.slides:
                     for shape in slide.shapes:
+                        # 1. PROCESS STANDARD TEXT FRAMES
                         if shape.has_text_frame:
-                            # Dynamic block clean replacement for regional manager details
                             if is_northern:
                                 current_text = shape.text_frame.text
-                                # Normalize spacing/newlines to safely catch string variations inside the shape
-                                normalized_text = re.sub(r'\s+', ' ', current_text).strip()
                                 if "Mohd Shahfiee Abdullah" in current_text or "Quality Improvement Central Region" in current_text:
                                     shape.text_frame.text = nr_manager_block
-                                    # Restore visual formatting properties to the new text block
                                     for paragraph in shape.text_frame.paragraphs:
+                                        paragraph.alignment = 1 # Center alignment
                                         for run in paragraph.runs:
                                             run.font.name = 'Arial'
                                             run.font.size = Pt(11)
@@ -488,6 +485,19 @@ if generate_btn:
                                     if "OE/SQI/CR/VO/001/2026" in paragraph.text:
                                         paragraph.text = paragraph.text.replace("OE/SQI/CR/VO/001/2026", selected_siri)
                                         for run in paragraph.runs: run.font.size = Pt(12)
+
+                        # 2. NEW PROCESS: SCAN & REPLACE TEXT DEEP INSIDE TABLE CELLS
+                        if shape.has_table:
+                            for row_idx in range(len(shape.table.rows)):
+                                for col_idx in range(len(shape.table.columns)):
+                                    cell = shape.table.cell(row_idx, col_idx)
+                                    if is_northern and ("Mohd Shahfiee Abdullah" in cell.text or "Quality Improvement Central Region" in cell.text):
+                                        cell.text = nr_manager_block
+                                        for paragraph in cell.text_frame.paragraphs:
+                                            paragraph.alignment = 1 # Center alignment
+                                            for run in paragraph.runs:
+                                                run.font.name = 'Arial'
+                                                run.font.size = Pt(11)
 
                 ppt_output = io.BytesIO()
                 prs.save(ppt_output)
