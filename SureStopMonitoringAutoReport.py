@@ -286,10 +286,10 @@ if generate_btn:
 
             df['cleaned_date'] = df.iloc[:, 0].apply(safe_date_convert)
             
-            # Changed reference from column D (index 3) to column AI (index 34)
+            # Changed reference from column D (index 3) to column AJ (index 35)
             mask = (df['cleaned_date'] >= start_date) & \
                    (df['cleaned_date'] <= end_date) & \
-                   (df.iloc[:, 34].astype(str).str.strip() == selected_depot)
+                   (df.iloc[:, 35].astype(str).str.strip() == selected_depot)
 
             filtered_data = df.loc[mask].copy()
 
