@@ -98,6 +98,14 @@ st.markdown("""
     .stProgress > div > div > div > div {
         background-color: #00FF66 !important;
     }
+    
+    /* Style custom Radio button container to match theme */
+    div[data-testid="stRadio"] > label {
+        margin-bottom: 8px !important;
+    }
+    div[data-testid="stRadio"] label p {
+        color: #00FF66 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -211,16 +219,23 @@ with col1:
     start_date = st.date_input("START DATE", value=datetime(2026, 4, 27))
 
 with col2:
-    depot_list = ["(OS) Batu Caves",	"(OS) Cheras Selatan",	"(OS) Maluri",	"(OS) Shah Alam",	"(SAL) Sungai Buloh",	"Asia Jaya",	"Balik Pulau",	"Batu Caves",	"BRT Sunway",	"Cheras Selatan",	"Kamunting",	"Kepong",	"Mak Mandin",	"Maluri",	"Melawati",	"MRT Jinjang",	"MRT Kajang",	"MRT Serdang",	"MRT Sungai Buloh",	"Nibong Tebal",	"Putrajaya",	"Sentul",	"Shah Alam",	"Sungai Nibong",	"Tanjung Bungah",	"Weld Quay"]
+    depot_list = ["(OS) Batu Caves", "(OS) Cheras Selatan", "(OS) Maluri", "(OS) Shah Alam", "(SAL) Sungai Buloh", "Asia Jaya", "Balik Pulau", "Batu Caves", "BRT Sunway", "Cheras Selatan", "Kamunting", "Kepong", "Mak Mandin", "Maluri", "Melawati", "MRT Jinjang", "MRT Kajang", "MRT Serdang", "MRT Sungai Buloh", "Nibong Tebal", "Putrajaya", "Sentul", "Shah Alam", "Sungai Nibong", "Tanjung Bungah", "Weld Quay"]
     selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
     siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
     selected_siri = st.selectbox("SIRI NUMBER", siri_list)
     end_date = st.date_input("END DATE", value=datetime(2026, 4, 30))
 
+# --- NEW FILTER BUTTON POSITIONED EXACTLY AS REQUESTED ---
+status_filter = st.radio(
+    "FILTER REPORT STATUS",
+    options=["All Status", "Not Comply Only"],
+    index=1,  # Defaults to "Not Comply Only" to keep original behavior intact
+    horizontal=True
+)
+
 st.divider()
 
 # --- UNIFORM BUTTON LEVEL ---
-# Ratio 1:1:2 ensures Run Generator is twice as wide as the others
 act_col1, act_col2, act_col3 = st.columns([1, 1, 2])
 
 with act_col1:
@@ -253,7 +268,6 @@ if refresh_btn:
 
 # --- EXECUTION LOGIC ---
 if generate_btn:
-    # Always pull from synced data now
     df = st.session_state.get('synced_data')
         
     if df is None:
@@ -264,7 +278,6 @@ if generate_btn:
         try:
             start_time = time.time()
             
-            # Date cleaning helper to prevent comparison errors
             def safe_date_convert(x):
                 try: 
                     return pd.to_datetime(x).date()
@@ -295,7 +308,11 @@ if generate_btn:
                 summary_list = []
 
                 for _, row in filtered_data.iterrows():
-                    if str(row.iloc[8]).strip().lower() == "yes": continue
+                    is_compliant = str(row.iloc[8]).strip().lower() == "yes"
+                    
+                    # --- DYNAMIC FILTER SELECTION ---
+                    if status_filter == "Not Comply Only" and is_compliant: 
+                        continue
 
                     summary_list.append(row)
                     new_data_slide = create_custom_slide(prs, slide1_template)
@@ -304,14 +321,20 @@ if generate_btn:
                     time_str = dt_raw.strftime('%H:%M:%S') if not pd.isnull(dt_raw) else "N/A"
 
                     col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
-                    pemerhatian = ""
-                    if col_i == "no": pemerhatian += "1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n"
-                    if col_j == "no": pemerhatian += "2. Kapten Bas tidak memandu / menggunakan lorong kiri"
+                    
+                    # Formatting text output handling if record complies
+                    if is_compliant and col_j == "yes":
+                        pemerhatian = "1. Pemanduan mematuhi peraturan.\n"
+                        cadangan = "1. Teruskan prestasi pemanduan yang cemerlang dan selamat."
+                    else:
+                        pemerhatian = ""
+                        if col_i == "no": pemerhatian += "1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n"
+                        if col_j == "no": pemerhatian += "2. Kapten Bas tidak memandu / menggunakan lorong kiri"
 
-                    cadangan = ""
-                    if col_i == "no" and col_j == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas and keperluan berada di lorong kiri."
-                    elif col_i == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas."
-                    elif col_j == "no": cadangan = "2. Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri."
+                        cadangan = ""
+                        if col_i == "no" and col_j == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas and keperluan berada di lorong kiri."
+                        elif col_i == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas."
+                        elif col_j == "no": cadangan = "2. Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri."
 
                     replacements = {
                         "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
@@ -342,12 +365,12 @@ if generate_btn:
                     download_and_insert_media(new_video_slide, row.iloc[26], left_inch=0, top_inch=0, width_inch=0, is_video_slide=True)
 
                     processed_count += 1
-                    progress_bar.progress(processed_count / total)
+                    progress_bar.progress(processed_count / total if total > 0 else 1.0)
                     status_text.text(f"COMPILING... {processed_count}/{total}")
 
                 # --- UPDATE STATUS TO COMPLETED ---
                 progress_bar.progress(1.0)
-                status_text.text(f"{processed_count}/{total} NOT COMPLY RECORDED - DONE!")
+                status_text.text(f"{processed_count} RECORDS RUN - DONE!")
 
                 if summary_list:
                     new_summary_slide = create_custom_slide(prs, slide3_template)
@@ -375,7 +398,9 @@ if generate_btn:
                             tr.cells[0].text = str(s_row.iloc[3]); tr.cells[1].text = str(s_row.iloc[4]); tr.cells[2].text = str(s_row.iloc[6]); tr.cells[3].text = str(s_row.iloc[5])
                             dt_full = pd.to_datetime(s_row.iloc[0]).strftime('%d/%m/%Y %H:%M:%S')
                             tr.cells[4].text = f"ID: {s_row.iloc[31]}\nNama: {s_row.iloc[32]}\nLaju: {s_row.iloc[30]} Km/h\nMasa: {dt_full}"
-                            tr.cells[5].text = "Tidak Mematuhi"
+                            
+                            # Dynamic status translation inside the summary slide
+                            tr.cells[5].text = "Mematuhi" if str(s_row.iloc[8]).strip().lower() == "yes" else "Tidak Mematuhi"
                             for cell in tr.cells:
                                 for para in cell.text_frame.paragraphs:
                                     for run in para.runs: run.font.size = Pt(8); run.font.name = "Arial"
