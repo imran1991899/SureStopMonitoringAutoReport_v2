@@ -221,7 +221,14 @@ with col1:
 with col2:
     depot_list = ["(OS) Batu Caves", "(OS) Cheras Selatan", "(OS) Maluri", "(OS) Shah Alam", "(SAL) Sungai Buloh", "Asia Jaya", "Balik Penang", "Batu Caves", "BRT Sunway", "Cheras Selatan", "Kamunting", "Kepong", "Mak Mandin", "Maluri", "Melawati", "MRT Jinjang", "MRT Kajang", "MRT Serdang", "MRT Sungai Buloh", "Nibong Tebal", "Putrajaya", "Sentul", "Shah Alam", "Sungai Nibong", "Tanjung Bungah", "Weld Quay"]
     selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
-    siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
+    
+    # Custom alternating loop setup for CR and NR paths sequentially from 1 to 100
+    siri_list = []
+    for i in range(1, 101):
+        num_str = str(i).zfill(3)
+        siri_list.append(f"OE/SQI/CR/VO/{num_str}/2026")
+        siri_list.append(f"OE/SQI/NR/VO/{num_str}/2026")
+        
     selected_siri = st.selectbox("SIRI NUMBER", siri_list)
     end_date = st.date_input("END DATE", value=datetime(2026, 4, 30))
 
