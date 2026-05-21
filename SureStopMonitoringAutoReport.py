@@ -119,7 +119,7 @@ st.markdown("""
 
 # --- GOOGLE SHEETS SETTINGS ---
 SHEET_ID = "1qlPsPPRKMTfoyMN0MmzK3Hu9wxiBFjYIX6IFMbriZmo"
-SHEET_NAME = "Sheet1"
+SHEET_NAME = "Sheet2"
 EXPORT_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx&sheet={SHEET_NAME}"
 
 # --- CORE LOGIC ---
