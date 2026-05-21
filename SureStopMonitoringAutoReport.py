@@ -219,7 +219,7 @@ with col1:
     start_date = st.date_input("START DATE", value=datetime(2026, 4, 27))
 
 with col2:
-    depot_list = ["(OS) Batu Caves", "(OS) Cheras Selatan", "(OS) Maluri", "(OS) Shah Alam", "(SAL) Sungai Buloh", "Asia Jaya", "Balik Pulau", "Batu Caves", "BRT Sunway", "Cheras Selatan", "Kamunting", "Kepong", "Mak Mandin", "Maluri", "Melawati", "MRT Jinjang", "MRT Kajang", "MRT Serdang", "MRT Sungai Buloh", "Nibong Tebal", "Putrajaya", "Sentul", "Shah Alam", "Sungai Nibong", "Tanjung Bungah", "Weld Quay"]
+    depot_list = ["(OS) Batu Caves", "(OS) Cheras Selatan", "(OS) Maluri", "(OS) Shah Alam", "(SAL) Sungai Buloh", "Asia Jaya", "Balik Penang", "Batu Caves", "BRT Sunway", "Cheras Selatan", "Kamunting", "Kepong", "Mak Mandin", "Maluri", "Melawati", "MRT Jinjang", "MRT Kajang", "MRT Serdang", "MRT Sungai Buloh", "Nibong Tebal", "Putrajaya", "Sentul", "Shah Alam", "Sungai Nibong", "Tanjung Bungah", "Weld Quay"]
     selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
     siri_list = [f"OE/SQI/CR/VO/{str(i).zfill(3)}/2026" for i in range(1, 101)]
     selected_siri = st.selectbox("SIRI NUMBER", siri_list)
@@ -380,8 +380,18 @@ if generate_btn:
                         height = orig_table_shape.height
                         rows_needed, cols_needed = len(summary_list) + 1, 6
                         new_summary_slide.shapes._spTree.remove(orig_table_shape.element)
+                        
+                        # Added table_1 styling structure to force clean minimalist grid lines without background color fills
                         new_table_shape = new_summary_slide.shapes.add_table(rows_needed, cols_needed, Inches(0.5), Inches(1.5), Inches(9.0), height)
                         summary_table = new_table_shape.table
+                        
+                        # Apply clear table style element configuration natively matching Table_1 style properties
+                        tblPr = summary_table._tbl.tblPr
+                        if tblPr is not None:
+                            tableStyleId = tblPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}tableStyleId')
+                            if tableStyleId is not None:
+                                tableStyleId.text = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
+                                
                         summary_table.columns[0].width = Inches(1.2); summary_table.columns[1].width = Inches(0.8)
                         summary_table.columns[2].width = Inches(1.0); summary_table.columns[3].width = Inches(2.2)
                         summary_table.columns[4].width = Inches(2.6); summary_table.columns[5].width = Inches(1.2)
