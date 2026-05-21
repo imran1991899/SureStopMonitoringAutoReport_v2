@@ -230,6 +230,31 @@ def clean_int_str(val):
     except (ValueError, TypeError):
         return str(val)
 
+def apply_nr_manager_formatting(text_frame):
+    """Helper to reconstruct paragraphs for the text frame with exact bolding, centering, and Calibri size 11."""
+    text_frame.clear()
+    
+    lines = [
+        ("Miran Nursyawalni Amir", True),
+        ("Assistant Manager,", False),
+        ("Quality Improvement Northern Region", False),
+        ("Service Quality & Innovation,", False),
+        ("Operational Excellence", False)
+    ]
+    
+    for idx, (line_text, should_bold) in enumerate(lines):
+        if idx == 0:
+            p = text_frame.paragraphs[0]
+        else:
+            p = text_frame.add_paragraph()
+            
+        p.alignment = 1 # Center align
+        run = p.add_run()
+        run.text = line_text
+        run.font.name = 'Calibri'
+        run.font.size = Pt(11)
+        run.font.bold = should_bold
+
 # --- STREAMLIT UI INPUTS ---
 
 TEMPLATE_FILENAME = "template.pptx"
@@ -457,9 +482,6 @@ if generate_btn:
                 is_northern = "/NR/" in selected_siri
                 region_name = "Northern Region" if is_northern else "Central Region"
                 full_replacement_text = f"{region_name} {obs_month} {datetime.now().year}"
-                
-                # Setup standard structure text blocks
-                nr_manager_block = "Miran Nursyawalni Amir\nAssistant Manager,\nQuality Improvement Northern Region\nService Quality & Innovation,\nOperational Excellence"
 
                 for slide in prs.slides:
                     for shape in slide.shapes:
@@ -468,12 +490,7 @@ if generate_btn:
                             if is_northern:
                                 current_text = shape.text_frame.text
                                 if "Mohd Shahfiee Abdullah" in current_text or "Quality Improvement Central Region" in current_text:
-                                    shape.text_frame.text = nr_manager_block
-                                    for paragraph in shape.text_frame.paragraphs:
-                                        paragraph.alignment = 1 # Center alignment
-                                        for run in paragraph.runs:
-                                            run.font.name = 'Arial'
-                                            run.font.size = Pt(11)
+                                    apply_nr_manager_formatting(shape.text_frame)
 
                             if "Januari-February 2026" in shape.text_frame.text:
                                 for paragraph in shape.text_frame.paragraphs:
@@ -486,18 +503,13 @@ if generate_btn:
                                         paragraph.text = paragraph.text.replace("OE/SQI/CR/VO/001/2026", selected_siri)
                                         for run in paragraph.runs: run.font.size = Pt(12)
 
-                        # 2. NEW PROCESS: SCAN & REPLACE TEXT DEEP INSIDE TABLE CELLS
+                        # 2. PROCESS TEXT DEEP INSIDE TABLE CELLS
                         if shape.has_table:
                             for row_idx in range(len(shape.table.rows)):
                                 for col_idx in range(len(shape.table.columns)):
                                     cell = shape.table.cell(row_idx, col_idx)
                                     if is_northern and ("Mohd Shahfiee Abdullah" in cell.text or "Quality Improvement Central Region" in cell.text):
-                                        cell.text = nr_manager_block
-                                        for paragraph in cell.text_frame.paragraphs:
-                                            paragraph.alignment = 1 # Center alignment
-                                            for run in paragraph.runs:
-                                                run.font.name = 'Arial'
-                                                run.font.size = Pt(11)
+                                        apply_nr_manager_formatting(cell.text_frame)
 
                 ppt_output = io.BytesIO()
                 prs.save(ppt_output)
