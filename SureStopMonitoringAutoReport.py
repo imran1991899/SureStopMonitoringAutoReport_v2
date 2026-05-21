@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS to match the "Vehicle Details" aesthetic
+# Custom CSS to match the "Vehicle Details" aesthetic and add the light blue glow
 st.markdown("""
     <style>
     /* Main Background - Very Dark Gray/Black */
@@ -87,6 +87,26 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #00FF66 !important;
         color: #000000 !important;
+    }
+
+    /* Target the Download button wrapper when it appears to give it a light blue glow */
+    div.stDownloadButton > button {
+        background-color: transparent !important;
+        color: #00E5FF !important;
+        border: 2px solid #00E5FF !important;
+        box-shadow: 0 0 15px rgba(0, 229, 255, 0.6) !important;
+        animation: pulseGlow 2s infinite alternate;
+    }
+
+    div.stDownloadButton > button:hover {
+        background-color: #00E5FF !important;
+        color: #000000 !important;
+        box-shadow: 0 0 25px rgba(0, 229, 255, 0.9) !important;
+    }
+
+    @keyframes pulseGlow {
+        from { box-shadow: 0 0 8px rgba(0, 229, 255, 0.4); }
+        to { box-shadow: 0 0 20px rgba(0, 229, 255, 0.8); }
     }
 
     /* Divider color */
@@ -201,6 +221,15 @@ def create_custom_slide(pres, slide_template):
 
     return new_slide
 
+def clean_int_str(val):
+    """Helper to convert float numbers or strings into clean standard integer text strings."""
+    try:
+        if pd.isna(val):
+            return "N/A"
+        return str(int(float(val)))
+    except (ValueError, TypeError):
+        return str(val)
+
 # --- STREAMLIT UI INPUTS ---
 
 TEMPLATE_FILENAME = "template.pptx"
@@ -222,7 +251,6 @@ with col2:
     depot_list = ["(OS) Batu Caves", "(OS) Cheras Selatan", "(OS) Maluri", "(OS) Shah Alam", "(SAL) Sungai Buloh", "Asia Jaya", "Balik Penang", "Batu Caves", "BRT Sunway", "Cheras Selatan", "Kamunting", "Kepong", "Mak Mandin", "Maluri", "Melawati", "MRT Jinjang", "MRT Kajang", "MRT Serdang", "MRT Sungai Buloh", "Nibong Tebal", "Putrajaya", "Sentul", "Shah Alam", "Sungai Nibong", "Tanjung Bungah", "Weld Quay"]
     selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
     
-    # Custom alternating loop setup for CR and NR paths sequentially from 1 to 100
     siri_list = []
     for i in range(1, 101):
         num_str = str(i).zfill(3)
@@ -232,11 +260,10 @@ with col2:
     selected_siri = st.selectbox("SIRI NUMBER", siri_list)
     end_date = st.date_input("END DATE", value=datetime(2026, 4, 30))
 
-# --- NEW FILTER BUTTON POSITIONED EXACTLY AS REQUESTED ---
 status_filter = st.radio(
     "FILTER REPORT STATUS",
     options=["All Status", "Not Comply Only"],
-    index=1,  # Defaults to "Not Comply Only" to keep original behavior intact
+    index=1,  
     horizontal=True
 )
 
@@ -293,7 +320,6 @@ if generate_btn:
 
             df['cleaned_date'] = df.iloc[:, 0].apply(safe_date_convert)
             
-            # Changed reference from column D (index 3) to column AJ (index 35)
             mask = (df['cleaned_date'] >= start_date) & \
                    (df['cleaned_date'] <= end_date) & \
                    (df.iloc[:, 35].astype(str).str.strip() == selected_depot)
@@ -318,7 +344,6 @@ if generate_btn:
                 for _, row in filtered_data.iterrows():
                     is_compliant = str(row.iloc[8]).strip().lower() == "yes"
                     
-                    # --- DYNAMIC FILTER SELECTION ---
                     if status_filter == "Not Comply Only" and is_compliant: 
                         continue
 
@@ -330,7 +355,6 @@ if generate_btn:
 
                     col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
                     
-                    # Formatting text output handling if record complies
                     if is_compliant and col_j == "yes":
                         pemerhatian = "1. Pemanduan mematuhi peraturan.\n"
                         cadangan = "1. Teruskan prestasi pemanduan yang cemerlang dan selamat."
@@ -346,13 +370,13 @@ if generate_btn:
 
                     replacements = {
                         "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
-                        "Nombor Bas :": f"Nombor Bas : {row.iloc[6]}",
-                        "Laluan pemerhatian :": f"Laluan pemerhatian : {row.iloc[4]}",
+                        "Nombor Bas :": f"Nombor Bas : {clean_int_str(row.iloc[6])}",
+                        "Laluan pemerhatian :": f"Laluan pemerhatian : {clean_int_str(row.iloc[4])}",
                         "Masa :": f"Masa : {time_str}",
                         "Lokasi / Hentian :": f"Lokasi / Hentian : {row.iloc[5]}",
                         "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[32]}",
-                        "ID Kapten Bas :": f"ID Kapten Bas : {row.iloc[31]}",
-                        "Kelajuan Dipandu :": f"Kelajuan Dipandu : {row.iloc[30]} Km/h",
+                        "ID Kapten Bas :": f"ID Kapten Bas : {clean_int_str(row.iloc[31])}",
+                        "Kelajuan Dipandu :": f"Kelajuan Dipandu : {clean_int_str(row.iloc[30])} Km/h",
                         "Nama PIC :": f"Nama PIC : {row.iloc[2]}",
                         "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
                         "Cadangan:": f"Cadangan:\n{cadangan}"
@@ -376,7 +400,6 @@ if generate_btn:
                     progress_bar.progress(processed_count / total if total > 0 else 1.0)
                     status_text.text(f"COMPILING... {processed_count}/{total}")
 
-                # --- UPDATE STATUS TO COMPLETED ---
                 progress_bar.progress(1.0)
                 status_text.text(f"{processed_count} RECORDS RUN - DONE!")
 
@@ -388,11 +411,9 @@ if generate_btn:
                         rows_needed, cols_needed = len(summary_list) + 1, 6
                         new_summary_slide.shapes._spTree.remove(orig_table_shape.element)
                         
-                        # Added table_1 styling structure to force clean minimalist grid lines without background color fills
                         new_table_shape = new_summary_slide.shapes.add_table(rows_needed, cols_needed, Inches(0.5), Inches(1.5), Inches(9.0), height)
                         summary_table = new_table_shape.table
                         
-                        # Apply clear table style element configuration natively matching Table_1 style properties
                         tblPr = summary_table._tbl.tblPr
                         if tblPr is not None:
                             tableStyleId = tblPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}tableStyleId')
@@ -413,11 +434,10 @@ if generate_btn:
                         for idx, s_row in enumerate(summary_list):
                             tr = summary_table.rows[idx + 1]
                             tr.height = Inches(0.7)
-                            tr.cells[0].text = str(s_row.iloc[3]); tr.cells[1].text = str(s_row.iloc[4]); tr.cells[2].text = str(s_row.iloc[6]); tr.cells[3].text = str(s_row.iloc[5])
+                            tr.cells[0].text = str(s_row.iloc[3]); tr.cells[1].text = clean_int_str(s_row.iloc[4]); tr.cells[2].text = clean_int_str(s_row.iloc[6]); tr.cells[3].text = str(s_row.iloc[5])
                             dt_full = pd.to_datetime(s_row.iloc[0]).strftime('%d/%m/%Y %H:%M:%S')
-                            tr.cells[4].text = f"ID: {s_row.iloc[31]}\nNama: {s_row.iloc[32]}\nLaju: {s_row.iloc[30]} Km/h\nMasa: {dt_full}"
+                            tr.cells[4].text = f"ID: {clean_int_str(s_row.iloc[31])}\nNama: {s_row.iloc[32]}\nLaju: {clean_int_str(s_row.iloc[30])} Km/h\nMasa: {dt_full}"
                             
-                            # Dynamic status translation inside the summary slide
                             tr.cells[5].text = "Mematuhi" if str(s_row.iloc[8]).strip().lower() == "yes" else "Tidak Mematuhi"
                             for cell in tr.cells:
                                 for para in cell.text_frame.paragraphs:
@@ -425,7 +445,6 @@ if generate_btn:
 
                 if slide6_template: create_custom_slide(prs, slide6_template)
 
-                # Reordering & Replacing Title
                 xml_slides = prs.slides._sldIdLst
                 for _ in range(3): xml_slides.remove(xml_slides[0])
                 if len(prs.slides) >= 3:
@@ -435,7 +454,6 @@ if generate_btn:
                     xml_slides.remove(slide_two_element); xml_slides.insert(0, slide_two_element)
                 if len(xml_slides) >= 4: xml_slides.remove(xml_slides[3])
 
-                # Determine region dynamically based on chosen Siri Number structure
                 region_name = "Northern Region" if "/NR/" in selected_siri else "Central Region"
                 full_replacement_text = f"{region_name} {obs_month} {datetime.now().year}"
                 
