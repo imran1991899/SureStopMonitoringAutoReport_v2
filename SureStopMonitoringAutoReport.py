@@ -435,7 +435,10 @@ if generate_btn:
                     xml_slides.remove(slide_two_element); xml_slides.insert(0, slide_two_element)
                 if len(xml_slides) >= 4: xml_slides.remove(xml_slides[3])
 
-                full_replacement_text = f"Central Region {obs_month} {datetime.now().year}"
+                # Determine region dynamically based on chosen Siri Number structure
+                region_name = "Northern Region" if "/NR/" in selected_siri else "Central Region"
+                full_replacement_text = f"{region_name} {obs_month} {datetime.now().year}"
+                
                 for slide in prs.slides:
                     for shape in slide.shapes:
                         if shape.has_text_frame:
