@@ -454,12 +454,30 @@ if generate_btn:
                     xml_slides.remove(slide_two_element); xml_slides.insert(0, slide_two_element)
                 if len(xml_slides) >= 4: xml_slides.remove(xml_slides[3])
 
-                region_name = "Northern Region" if "/NR/" in selected_siri else "Central Region"
+                is_northern = "/NR/" in selected_siri
+                region_name = "Northern Region" if is_northern else "Central Region"
                 full_replacement_text = f"{region_name} {obs_month} {datetime.now().year}"
                 
+                # Setup strings for matching and dynamic swapping of regional managers
+                cr_manager_block = "Mohd Shahfiee Abdullah\u200b\nAssistant Manager,\u200b\u200b\nQuality Improvement Central Region\u200b\nService Quality & Innovation,\u200b\u200b\nOperational Excellence"
+                nr_manager_block = "Miran Nursyawalni Amir\nAssistant Manager,\u200b\u200b\nQuality Improvement Northern Region\u200b\nService Quality & Innovation,\u200b\u200b\nOperational Excellence"
+
                 for slide in prs.slides:
                     for shape in slide.shapes:
                         if shape.has_text_frame:
+                            # Dynamic block clean replacement for regional manager details
+                            if is_northern:
+                                current_text = shape.text_frame.text
+                                # Normalize spacing/newlines to safely catch string variations inside the shape
+                                normalized_text = re.sub(r'\s+', ' ', current_text).strip()
+                                if "Mohd Shahfiee Abdullah" in current_text or "Quality Improvement Central Region" in current_text:
+                                    shape.text_frame.text = nr_manager_block
+                                    # Restore visual formatting properties to the new text block
+                                    for paragraph in shape.text_frame.paragraphs:
+                                        for run in paragraph.runs:
+                                            run.font.name = 'Arial'
+                                            run.font.size = Pt(11)
+
                             if "Januari-February 2026" in shape.text_frame.text:
                                 for paragraph in shape.text_frame.paragraphs:
                                     if "Januari-February 2026" in paragraph.text:
