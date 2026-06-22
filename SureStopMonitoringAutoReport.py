@@ -399,7 +399,7 @@ if generate_btn:
                         "Laluan pemerhatian :": f"Laluan pemerhatian : {clean_int_str(row.iloc[4])}",
                         "Masa :": f"Masa : {time_str}",
                         "Lokasi / Hentian :": f"Lokasi / Hentian : {row.iloc[5]}",
-                        "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[32]}",
+                        "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[33]}",
                         "ID Kapten Bas :": f"ID Kapten Bas : {clean_int_str(row.iloc[31])}",
                         "Kelajuan Dipandu :": f"Kelajuan Dipandu : {clean_int_str(row.iloc[30])} Km/h",
                         "Nama PIC :": f"Nama PIC : {row.iloc[2]}",
