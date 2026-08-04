@@ -1,27 +1,30 @@
+import copy
+from datetime import datetime
+import io
+import os
+import re
+import time
+import cv2
+import gspread
+from google.oauth2.service_account import Credentials
 import pandas as pd
 from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.dml.color import RGBColor
-import os
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.util import Inches, Pt
 import requests
-import re
-import io
-import cv2
-import copy
-import time
-from datetime import datetime
 import streamlit as st
 
 # --- STREAMLIT SETTINGS (Neon Green & Black Theme) ---
 st.set_page_config(
-    page_title="Auto Generate Report Observation", 
+    page_title="Auto Generate Report Observation",
     layout="centered",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
 # Custom CSS to match the "Vehicle Details" aesthetic and add the light blue glow
-st.markdown("""
+st.markdown(
+    """
     <style>
     /* Main Background - Very Dark Gray/Black */
     .stApp {
@@ -75,7 +78,7 @@ st.markdown("""
     }
 
     /* Buttons - Neon Green Outline/Solid */
-    .stButton>button {
+    .stButton>button, .stFileUploader section {
         background-color: transparent !important;
         color: #00FF66 !important;
         border: 2px solid #00FF66 !important;
@@ -127,133 +130,226 @@ st.markdown("""
         color: #00FF66 !important;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 # --- HEADER INJECTION ---
-st.markdown("""
+st.markdown(
+    """
     <div class="custom-header">
         <p class="header-title">OBSERVATION DETAILS</p>
         <span style="color: #FF3366; font-weight: bold; font-family: sans-serif; cursor: pointer;">✕</span>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 # --- GOOGLE SHEETS SETTINGS ---
 SHEET_ID = "1qlPsPPRKMTfoyMN0MmzK3Hu9wxiBFjYIX6IFMbriZmo"
 SHEET_NAME = "Sheet2"
+UPLOAD_TAB_NAME = "BC,Bus&Routes"
 EXPORT_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx&sheet={SHEET_NAME}"
+
+
+# --- GOOGLE SHEETS WRITE FUNCTION ---
+def append_excel_to_gsheet(uploaded_file, sheet_id, tab_name):
+  """Appends rows from an uploaded Excel file to the specified Google Sheet tab."""
+  scope = [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive",
+  ]
+
+  # Authenticate using Streamlit secrets or local service account file
+  if "gcp_service_account" in st.secrets:
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], scopes=scope
+    )
+  elif os.path.exists("credentials.json"):
+    creds = Credentials.from_service_account_file(
+        "credentials.json", scopes=scope
+    )
+  else:
+    raise Exception(
+        "Google API credentials not found. Please add service account keys to"
+        " Streamlit secrets or 'credentials.json'."
+    )
+
+  client = gspread.authorize(creds)
+  spreadsheet = client.open_by_key(sheet_id)
+
+  try:
+    worksheet = spreadsheet.worksheet(tab_name)
+  except gspread.exceptions.WorksheetNotFound:
+    worksheet = spreadsheet.add_worksheet(
+        title=tab_name, rows="100", cols="20"
+    )
+
+  # Read Excel File
+  excel_df = pd.read_excel(uploaded_file)
+  cleaned_df = excel_df.fillna("")
+
+  # Convert DataFrame rows to list of lists
+  values_to_append = cleaned_df.values.tolist()
+
+  if not values_to_append:
+    st.warning("Uploaded file is empty.")
+    return False
+
+  # Append rows to Google Sheet tab
+  worksheet.append_rows(values_to_append, value_input_option="USER_ENTERED")
+  return True
+
 
 # --- CORE LOGIC ---
 
-def download_and_insert_media(slide, link_data, left_inch, top_inch, width_inch, is_video_slide=False):
-    if not isinstance(link_data, str) or "drive.google.com" not in link_data:
-        return
-    video_folder = "downloaded_videos"
-    if not os.path.exists(video_folder): os.makedirs(video_folder)
-    links = [l.strip() for l in link_data.split(';') if l.strip()]
 
-    for index, clean_link in enumerate(links):
-        file_id_match = re.search(r'[-\w]{25,}', clean_link)
-        if file_id_match:
-            file_id = file_id_match.group(0)
-            session = requests.Session()
-            download_url = "https://docs.google.com/uc?export=download"
-            params = {'id': file_id, 'confirm': 't'}
+def download_and_insert_media(
+    slide,
+    link_data,
+    left_inch,
+    top_inch,
+    width_inch,
+    is_video_slide=False,
+):
+  if not isinstance(link_data, str) or "drive.google.com" not in link_data:
+    return
+  video_folder = "downloaded_videos"
+  if not os.path.exists(video_folder):
+    os.makedirs(video_folder)
+  links = [l.strip() for l in link_data.split(";") if l.strip()]
 
-            if is_video_slide:
-                current_left = 2.0
-                current_top = 1.5
-                current_width = 6.0
-            else:
-                current_left = left_inch
-                current_top = top_inch + (index * 2.1)
-                current_width = width_inch
+  for index, clean_link in enumerate(links):
+    file_id_match = re.search(r"[-\w]{25,}", clean_link)
+    if file_id_match:
+      file_id = file_id_match.group(0)
+      session = requests.Session()
+      download_url = "https://docs.google.com/uc?export=download"
+      params = {"id": file_id, "confirm": "t"}
 
-            try:
-                response = session.get(download_url, params=params, stream=True, timeout=30)
-                if response.status_code == 200:
-                    content_type = response.headers.get('Content-Type', '')
+      if is_video_slide:
+        current_left = 2.0
+        current_top = 1.5
+        current_width = 6.0
+      else:
+        current_left = left_inch
+        current_top = top_inch + (index * 2.1)
+        current_width = width_inch
 
-                    if 'image' in content_type and not is_video_slide:
-                        image_data = io.BytesIO(response.content)
-                        slide.shapes.add_picture(image_data, Inches(current_left), Inches(current_top), width=Inches(current_width))
+      try:
+        response = session.get(
+            download_url, params=params, stream=True, timeout=30
+        )
+        if response.status_code == 200:
+          content_type = response.headers.get("Content-Type", "")
 
-                    elif ('video' in content_type or 'octet-stream' in content_type) and is_video_slide:
-                        video_path = os.path.join(video_folder, f"video_{file_id}.mp4")
-                        thumb_path = os.path.join(video_folder, f"thumb_{file_id}.jpg")
-                        with open(video_path, 'wb') as f:
-                            for chunk in response.iter_content(chunk_size=8192): f.write(chunk)
+          if "image" in content_type and not is_video_slide:
+            image_data = io.BytesIO(response.content)
+            slide.shapes.add_picture(
+                image_data,
+                Inches(current_left),
+                Inches(current_top),
+                width=Inches(current_width),
+            )
 
-                        vidcap = cv2.VideoCapture(video_path)
-                        vidcap.set(cv2.CAP_PROP_POS_MSEC, 12000)
-                        success, image = vidcap.read()
-                        if not success:
-                            vidcap.set(cv2.CAP_PROP_POS_MSEC, 0)
-                            success, image = vidcap.read()
-                        if success: cv2.imwrite(thumb_path, image)
-                        vidcap.release()
+          elif (
+              "video" in content_type or "octet-stream" in content_type
+          ) and is_video_slide:
+            video_path = os.path.join(video_folder, f"video_{file_id}.mp4")
+            thumb_path = os.path.join(video_folder, f"thumb_{file_id}.jpg")
+            with open(video_path, "wb") as f:
+              for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
 
-                        slide.shapes.add_movie(video_path, Inches(current_left), Inches(current_top), width=Inches(current_width), height=Inches(current_width * 0.56), poster_frame_image=thumb_path if os.path.exists(thumb_path) else None, mime_type='video/mp4')
-            except Exception as e: st.error(f"Error media {file_id}: {e}")
+            vidcap = cv2.VideoCapture(video_path)
+            vidcap.set(cv2.CAP_PROP_POS_MSEC, 12000)
+            success, image = vidcap.read()
+            if not success:
+              vidcap.set(cv2.CAP_PROP_POS_MSEC, 0)
+              success, image = vidcap.read()
+            if success:
+              cv2.imwrite(thumb_path, image)
+            vidcap.release()
+
+            slide.shapes.add_movie(
+                video_path,
+                Inches(current_left),
+                Inches(current_top),
+                width=Inches(current_width),
+                height=Inches(current_width * 0.56),
+                poster_frame_image=(
+                    thumb_path if os.path.exists(thumb_path) else None
+                ),
+                mime_type="video/mp4",
+            )
+      except Exception as e:
+        st.error(f"Error media {file_id}: {e}")
+
 
 def create_custom_slide(pres, slide_template):
-    blank_layout = pres.slide_layouts[6]
-    new_slide = pres.slides.add_slide(blank_layout)
+  blank_layout = pres.slide_layouts[6]
+  new_slide = pres.slides.add_slide(blank_layout)
 
-    for shp in list(new_slide.shapes):
-        new_slide.shapes._spTree.remove(shp.element)
+  for shp in list(new_slide.shapes):
+    new_slide.shapes._spTree.remove(shp.element)
 
-    slide_height = pres.slide_height
-    footer_threshold = slide_height * 0.85
+  slide_height = pres.slide_height
+  footer_threshold = slide_height * 0.85
 
-    for shape in slide_template.shapes:
-        if shape.is_placeholder or shape.top > footer_threshold:
-            continue
+  for shape in slide_template.shapes:
+    if shape.is_placeholder or shape.top > footer_threshold:
+      continue
 
-        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-            img_stream = io.BytesIO(shape.image.blob)
-            new_slide.shapes.add_picture(img_stream, shape.left, shape.top, shape.width, shape.height)
-        elif shape.has_table:
-            new_el = copy.deepcopy(shape.element)
-            new_slide.shapes._spTree.insert_element_before(new_el, 'p:extLst')
-        else:
-            new_el = copy.deepcopy(shape.element)
-            new_slide.shapes._spTree.insert_element_before(new_el, 'p:extLst')
+    if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+      img_stream = io.BytesIO(shape.image.blob)
+      new_slide.shapes.add_picture(
+          img_stream, shape.left, shape.top, shape.width, shape.height
+      )
+    elif shape.has_table:
+      new_el = copy.deepcopy(shape.element)
+      new_slide.shapes._spTree.insert_element_before(new_el, "p:extLst")
+    else:
+      new_el = copy.deepcopy(shape.element)
+      new_slide.shapes._spTree.insert_element_before(new_el, "p:extLst")
 
-    return new_slide
+  return new_slide
+
 
 def clean_int_str(val):
-    """Helper to convert float numbers or strings into clean standard integer text strings."""
-    try:
-        if pd.isna(val):
-            return "N/A"
-        return str(int(float(val)))
-    except (ValueError, TypeError):
-        return str(val)
+  """Helper to convert float numbers or strings into clean standard integer text strings."""
+  try:
+    if pd.isna(val):
+      return "N/A"
+    return str(int(float(val)))
+  except (ValueError, TypeError):
+    return str(val)
+
 
 def apply_nr_manager_formatting(text_frame):
-    """Helper to reconstruct paragraphs for the text frame with exact bolding, centering, and Calibri size 11."""
-    text_frame.clear()
-    
-    lines = [
-        ("Miran Nursyawalni Amir", True),
-        ("Assistant Manager,", False),
-        ("Quality Improvement Northern Region", False),
-        ("Service Quality & Innovation,", False),
-        ("Operational Excellence", False)
-    ]
-    
-    for idx, (line_text, should_bold) in enumerate(lines):
-        if idx == 0:
-            p = text_frame.paragraphs[0]
-        else:
-            p = text_frame.add_paragraph()
-            
-        p.alignment = 1 # Center align
-        run = p.add_run()
-        run.text = line_text
-        run.font.name = 'Calibri'
-        run.font.size = Pt(11)
-        run.font.bold = should_bold
+  """Helper to reconstruct paragraphs for the text frame with exact bolding, centering, and Calibri size 11."""
+  text_frame.clear()
+
+  lines = [
+      ("Miran Nursyawalni Amir", True),
+      ("Assistant Manager,", False),
+      ("Quality Improvement Northern Region", False),
+      ("Service Quality & Innovation,", False),
+      ("Operational Excellence", False),
+  ]
+
+  for idx, (line_text, should_bold) in enumerate(lines):
+    if idx == 0:
+      p = text_frame.paragraphs[0]
+    else:
+      p = text_frame.add_paragraph()
+
+    p.alignment = 1  # Center align
+    run = p.add_run()
+    run.text = line_text
+    run.font.name = "Calibri"
+    run.font.size = Pt(11)
+    run.font.bold = should_bold
+
 
 # --- STREAMLIT UI INPUTS ---
 
@@ -261,269 +357,457 @@ TEMPLATE_FILENAME = "template.pptx"
 template_exists = os.path.exists(TEMPLATE_FILENAME)
 
 if not template_exists:
-    st.error(f"STATUS: '{TEMPLATE_FILENAME}' NOT FOUND")
+  st.error(f"STATUS: '{TEMPLATE_FILENAME}' NOT FOUND")
 else:
-    st.success(f"STATUS: TEMPLATE LOADED")
+  st.success("STATUS: TEMPLATE LOADED")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    report_title = st.text_input("REPORT TITLE", placeholder="Input Title...")
-    obs_month = st.selectbox("OBSERVATION MONTH", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
-    start_date = st.date_input("START DATE", value=datetime(2026, 4, 27))
+  report_title = st.text_input("REPORT TITLE", placeholder="Input Title...")
+  obs_month = st.selectbox(
+      "OBSERVATION MONTH",
+      [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+      ],
+  )
+  start_date = st.date_input("START DATE", value=datetime(2026, 4, 27))
 
 with col2:
-    depot_list = ["(OS) Batu Caves", "(OS) Cheras Selatan", "(OS) Maluri", "(OS) Shah Alam", "(SAL) Sungai Buloh", "Asia Jaya", "Balik Penang", "Batu Caves", "BRT Sunway", "Cheras Selatan", "Kamunting", "Kepong", "Mak Mandin", "Maluri", "Melawati", "MRT Jinjang", "MRT Kajang", "MRT Serdang", "MRT Sungai Buloh", "Nibong Tebal", "Putrajaya", "Sentul", "Shah Alam", "Sungai Nibong", "Tanjung Bungah", "Weld Quay"]
-    selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
-    
-    siri_list = []
-    for i in range(1, 101):
-        num_str = str(i).zfill(3)
-        siri_list.append(f"OE/SQI/CR/VO/{num_str}/2026")
-        siri_list.append(f"OE/SQI/NR/VO/{num_str}/2026")
-        
-    selected_siri = st.selectbox("SIRI NUMBER", siri_list)
-    end_date = st.date_input("END DATE", value=datetime(2026, 4, 30))
+  depot_list = [
+      "(OS) Batu Caves",
+      "(OS) Cheras Selatan",
+      "(OS) Maluri",
+      "(OS) Shah Alam",
+      "(SAL) Sungai Buloh",
+      "Asia Jaya",
+      "Balik Penang",
+      "Batu Caves",
+      "BRT Sunway",
+      "Cheras Selatan",
+      "Kamunting",
+      "Kepong",
+      "Mak Mandin",
+      "Maluri",
+      "Melawati",
+      "MRT Jinjang",
+      "MRT Kajang",
+      "MRT Serdang",
+      "MRT Sungai Buloh",
+      "Nibong Tebal",
+      "Putrajaya",
+      "Sentul",
+      "Shah Alam",
+      "Sungai Nibong",
+      "Tanjung Bungah",
+      "Weld Quay",
+  ]
+  selected_depot = st.selectbox("DEPOT LOCATION", depot_list)
+
+  siri_list = []
+  for i in range(1, 101):
+    num_str = str(i).zfill(3)
+    siri_list.append(f"OE/SQI/CR/VO/{num_str}/2026")
+    siri_list.append(f"OE/SQI/NR/VO/{num_str}/2026")
+
+  selected_siri = st.selectbox("SIRI NUMBER", siri_list)
+  end_date = st.date_input("END DATE", value=datetime(2026, 4, 30))
 
 status_filter = st.radio(
     "FILTER REPORT STATUS",
     options=["All Status", "Not Comply Only"],
-    index=1,  
-    horizontal=True
+    index=1,
+    horizontal=True,
 )
 
 st.divider()
 
-# --- UNIFORM BUTTON LEVEL ---
-act_col1, act_col2, act_col3 = st.columns([1, 1, 2])
+# --- UNIFORM BUTTON LEVEL (UPDATED WITH UPLOAD BUTTON TO THE LEFT) ---
+uploaded_file = st.file_uploader(
+    "UPLOAD EXCEL (BC,BUS&ROUTES)", type=["xlsx", "xls"], label_visibility="collapsed"
+)
+
+act_col0, act_col1, act_col2, act_col3 = st.columns([1.5, 1, 1, 1.5])
+
+with act_col0:
+  upload_bc_btn = st.button(
+      "📤 Upload BC,Bus&Routes", use_container_width=True
+  )
 
 with act_col1:
-    sync_btn = st.button("🔄 Update GSheet", use_container_width=True)
+  sync_btn = st.button("🔄 Update GSheet", use_container_width=True)
 
 with act_col2:
-    refresh_btn = st.button("REFRESH", use_container_width=True, key="refresh_trigger")
+  refresh_btn = st.button(
+      "REFRESH", use_container_width=True, key="refresh_trigger"
+  )
 
 with act_col3:
-    generate_btn = st.button("RUN GENERATOR", use_container_width=True)
+  generate_btn = st.button("RUN GENERATOR", use_container_width=True)
 
 
 # --- BUTTON LOGIC HANDLERS ---
-if sync_btn:
+if upload_bc_btn:
+  if uploaded_file is None:
+    st.error("PLEASE SELECT AN EXCEL FILE TO UPLOAD FIRST.")
+  else:
     try:
-        response = requests.get(EXPORT_URL, timeout=30)
-        if response.status_code == 200:
-            st.session_state.synced_data = pd.read_excel(io.BytesIO(response.content), sheet_name=SHEET_NAME)
-            st.success("SYNC COMPLETE: Loaded data from Google Sheets.")
-        else:
-            st.error("SYNC FAILED: Could not reach Google Sheets.")
+      with st.spinner("Uploading & appending to Google Sheets..."):
+        success = append_excel_to_gsheet(
+            uploaded_file, SHEET_ID, UPLOAD_TAB_NAME
+        )
+        if success:
+          st.success(
+              f"SUCCESS: Data appended to tab '{UPLOAD_TAB_NAME}' in Google"
+              " Sheet!"
+          )
     except Exception as e:
-        st.error(f"SYNC ERROR: {e}")
+      st.error(f"UPLOAD ERROR: {e}")
+
+if sync_btn:
+  try:
+    response = requests.get(EXPORT_URL, timeout=30)
+    if response.status_code == 200:
+      st.session_state.synced_data = pd.read_excel(
+          io.BytesIO(response.content), sheet_name=SHEET_NAME
+      )
+      st.success("SYNC COMPLETE: Loaded data from Google Sheets.")
+    else:
+      st.error("SYNC FAILED: Could not reach Google Sheets.")
+  except Exception as e:
+    st.error(f"SYNC ERROR: {e}")
 
 if refresh_btn:
-    if 'synced_data' in st.session_state:
-        del st.session_state.synced_data
-    st.cache_data.clear()
-    st.rerun()
+  if "synced_data" in st.session_state:
+    del st.session_state.synced_data
+  st.cache_data.clear()
+  st.rerun()
 
 # --- EXECUTION LOGIC ---
 if generate_btn:
-    df = st.session_state.get('synced_data')
-        
-    if df is None:
-        st.error("ERROR: PLEASE CLICK 'SYNC FROM GSHEET' FIRST")
-    elif not template_exists:
-        st.error("ERROR: TEMPLATE MISSING")
-    else:
+  df = st.session_state.get("synced_data")
+
+  if df is None:
+    st.error("ERROR: PLEASE CLICK 'SYNC FROM GSHEET' FIRST")
+  elif not template_exists:
+    st.error("ERROR: TEMPLATE MISSING")
+  else:
+    try:
+      start_time = time.time()
+
+      def safe_date_convert(x):
         try:
-            start_time = time.time()
-            
-            def safe_date_convert(x):
-                try: 
-                    return pd.to_datetime(x).date()
-                except: 
-                    return None
+          return pd.to_datetime(x).date()
+        except:
+          return None
 
-            df['cleaned_date'] = df.iloc[:, 0].apply(safe_date_convert)
-            
-            mask = (df['cleaned_date'] >= start_date) & \
-                   (df['cleaned_date'] <= end_date) & \
-                   (df.iloc[:, 35].astype(str).str.strip() == selected_depot)
+      df["cleaned_date"] = df.iloc[:, 0].apply(safe_date_convert)
 
-            filtered_data = df.loc[mask].copy()
+      mask = (
+          (df["cleaned_date"] >= start_date)
+          & (df["cleaned_date"] <= end_date)
+          & (df.iloc[:, 35].astype(str).str.strip() == selected_depot)
+      )
 
-            if filtered_data.empty:
-                st.warning(f"NO RECORDS FOUND FOR {selected_depot}")
-            else:
-                prs = Presentation(TEMPLATE_FILENAME)
-                slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
-                slide1_template = prs.slides[0]
-                slide2_template = prs.slides[1]
-                slide3_template = prs.slides[2]
+      filtered_data = df.loc[mask].copy()
 
-                processed_count = 0
-                total = len(filtered_data)
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                summary_list = []
+      if filtered_data.empty:
+        st.warning(f"NO RECORDS FOUND FOR {selected_depot}")
+      else:
+        prs = Presentation(TEMPLATE_FILENAME)
+        slide6_template = prs.slides[5] if len(prs.slides) >= 6 else None
+        slide1_template = prs.slides[0]
+        slide2_template = prs.slides[1]
+        slide3_template = prs.slides[2]
 
-                for _, row in filtered_data.iterrows():
-                    is_compliant = str(row.iloc[8]).strip().lower() == "yes"
-                    
-                    if status_filter == "Not Comply Only" and is_compliant: 
-                        continue
+        processed_count = 0
+        total = len(filtered_data)
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        summary_list = []
 
-                    summary_list.append(row)
-                    new_data_slide = create_custom_slide(prs, slide1_template)
-                    dt_raw = pd.to_datetime(row.iloc[0])
-                    date_str = dt_raw.strftime('%d/%m/%Y') if not pd.isnull(dt_raw) else "N/A"
-                    time_str = dt_raw.strftime('%H:%M:%S') if not pd.isnull(dt_raw) else "N/A"
+        for _, row in filtered_data.iterrows():
+          is_compliant = str(row.iloc[8]).strip().lower() == "yes"
 
-                    col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
-                    
-                    if is_compliant and col_j == "yes":
-                        pemerhatian = "1. Pemanduan mematuhi peraturan.\n"
-                        cadangan = "1. Teruskan prestasi pemanduan yang cemerlang dan selamat."
-                    else:
-                        pemerhatian = ""
-                        if col_i == "no": pemerhatian += "1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n"
-                        if col_j == "no": pemerhatian += "2. Kapten Bas tidak memandu / menggunakan lorong kiri"
+          if status_filter == "Not Comply Only" and is_compliant:
+            continue
 
-                        cadangan = ""
-                        if col_i == "no" and col_j == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas and keperluan berada di lorong kiri."
-                        elif col_i == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas."
-                        elif col_j == "no": cadangan = "2. Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri."
+          summary_list.append(row)
+          new_data_slide = create_custom_slide(prs, slide1_template)
+          dt_raw = pd.to_datetime(row.iloc[0])
+          date_str = (
+              dt_raw.strftime("%d/%m/%Y") if not pd.isnull(dt_raw) else "N/A"
+          )
+          time_str = (
+              dt_raw.strftime("%H:%M:%S") if not pd.isnull(dt_raw) else "N/A"
+          )
 
-                    replacements = {
-                        "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
-                        "Nombor Bas :": f"Nombor Bas : {clean_int_str(row.iloc[6])}",
-                        "Laluan pemerhatian :": f"Laluan pemerhatian : {clean_int_str(row.iloc[4])}",
-                        "Masa :": f"Masa : {time_str}",
-                        "Lokasi / Hentian :": f"Lokasi / Hentian : {row.iloc[5]}",
-                        "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[33]}",
-                        "ID Kapten Bas :": f"ID Kapten Bas : {clean_int_str(row.iloc[31])}",
-                        "Kelajuan Dipandu :": f"Kelajuan Dipandu : {clean_int_str(row.iloc[30])} Km/h",
-                        "Nama PIC :": f"Nama PIC : {row.iloc[2]}",
-                        "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
-                        "Cadangan:": f"Cadangan:\n{cadangan}"
-                    }
+          col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
 
-                    for shape in new_data_slide.shapes:
-                        if shape.has_table:
-                            for r in shape.table.rows:
-                                for cell in r.cells:
-                                    for paragraph in cell.text_frame.paragraphs:
-                                        for key, value in replacements.items():
-                                            if key in paragraph.text:
-                                                paragraph.text = paragraph.text.replace(key, str(value))
-                                                for run in paragraph.runs: run.font.size = Pt(10)
+          if is_compliant and col_j == "yes":
+            pemerhatian = "1. Pemanduan mematuhi peraturan.\n"
+            cadangan = (
+                "1. Teruskan prestasi pemanduan yang cemerlang dan selamat."
+            )
+          else:
+            pemerhatian = ""
+            if col_i == "no":
+              pemerhatian += (
+                  "1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan"
+                  " kelajuan melebihi 25 km/j.\n"
+              )
+            if col_j == "no":
+              pemerhatian += (
+                  "2. Kapten Bas tidak memandu / menggunakan lorong kiri"
+              )
 
-                    download_and_insert_media(new_data_slide, row.iloc[26], left_inch=0.6, top_inch=2.1, width_inch=3.8, is_video_slide=False)
-                    new_video_slide = create_custom_slide(prs, slide2_template)
-                    download_and_insert_media(new_video_slide, row.iloc[26], left_inch=0, top_inch=0, width_inch=0, is_video_slide=True)
+            cadangan = ""
+            if col_i == "no" and col_j == "no":
+              cadangan = (
+                  "1. Memberi peringatan/kaunseling kepada Kapten Bas"
+                  " memperlahankan bas and keperluan berada di lorong kiri."
+              )
+            elif col_i == "no":
+              cadangan = (
+                  "1. Memberi peringatan/kaunseling kepada Kapten Bas"
+                  " memperlahankan bas di setiap hentian bas."
+              )
+            elif col_j == "no":
+              cadangan = (
+                  "2. Memberi peringatan kepada Kapten Bas mengenai keperluan"
+                  " berada di lorong kiri."
+              )
 
-                    processed_count += 1
-                    progress_bar.progress(processed_count / total if total > 0 else 1.0)
-                    status_text.text(f"COMPILING... {processed_count}/{total}")
+          replacements = {
+              "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
+              "Nombor Bas :": f"Nombor Bas : {clean_int_str(row.iloc[6])}",
+              "Laluan pemerhatian :": (
+                  f"Laluan pemerhatian : {clean_int_str(row.iloc[4])}"
+              ),
+              "Masa :": f"Masa : {time_str}",
+              "Lokasi / Hentian :": f"Lokasi / Hentian : {row.iloc[5]}",
+              "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[33]}",
+              "ID Kapten Bas :": (
+                  f"ID Kapten Bas : {clean_int_str(row.iloc[31])}"
+              ),
+              "Kelajuan Dipandu :": (
+                  f"Kelajuan Dipandu : {clean_int_str(row.iloc[30])} Km/h"
+              ),
+              "Nama PIC :": f"Nama PIC : {row.iloc[2]}",
+              "Pemerhatian Pemanduan Kapten Bas :": (
+                  "Pemerhatian Pemanduan Kapten Bas :\n" + f"{pemerhatian}"
+              ),
+              "Cadangan:": f"Cadangan:\n{cadangan}",
+          }
 
-                progress_bar.progress(1.0)
-                status_text.text(f"{processed_count} RECORDS RUN - DONE!")
+          for shape in new_data_slide.shapes:
+            if shape.has_table:
+              for r in shape.table.rows:
+                for cell in r.cells:
+                  for paragraph in cell.text_frame.paragraphs:
+                    for key, value in replacements.items():
+                      if key in paragraph.text:
+                        paragraph.text = paragraph.text.replace(key, str(value))
+                        for run in paragraph.runs:
+                          run.font.size = Pt(10)
 
-                if summary_list:
-                    new_summary_slide = create_custom_slide(prs, slide3_template)
-                    orig_table_shape = next((s for s in new_summary_slide.shapes if s.has_table), None)
-                    if orig_table_shape:
-                        height = orig_table_shape.height
-                        rows_needed, cols_needed = len(summary_list) + 1, 6
-                        new_summary_slide.shapes._spTree.remove(orig_table_shape.element)
-                        
-                        new_table_shape = new_summary_slide.shapes.add_table(rows_needed, cols_needed, Inches(0.5), Inches(1.5), Inches(9.0), height)
-                        summary_table = new_table_shape.table
-                        
-                        tblPr = summary_table._tbl.tblPr
-                        if tblPr is not None:
-                            tableStyleId = tblPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}tableStyleId')
-                            if tableStyleId is not None:
-                                tableStyleId.text = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
-                                
-                        summary_table.columns[0].width = Inches(1.2); summary_table.columns[1].width = Inches(0.8)
-                        summary_table.columns[2].width = Inches(1.0); summary_table.columns[3].width = Inches(2.2)
-                        summary_table.columns[4].width = Inches(2.6); summary_table.columns[5].width = Inches(1.2)
+          download_and_insert_media(
+              new_data_slide,
+              row.iloc[26],
+              left_inch=0.6,
+              top_inch=2.1,
+              width_inch=3.8,
+              is_video_slide=False,
+          )
+          new_video_slide = create_custom_slide(prs, slide2_template)
+          download_and_insert_media(
+              new_video_slide,
+              row.iloc[26],
+              left_inch=0,
+              top_inch=0,
+              width_inch=0,
+              is_video_slide=True,
+          )
 
-                        headers = ["Depoh", "Laluan", "Nombor Bas", "Hentian Bas", "Pengesahan", "Status"]
-                        for i, h_text in enumerate(headers):
-                            cell = summary_table.rows[0].cells[i]
-                            cell.text = h_text
-                            for para in cell.text_frame.paragraphs:
-                                for run in para.runs: run.font.size = Pt(10); run.font.bold = True
+          processed_count += 1
+          progress_bar.progress(
+              processed_count / total if total > 0 else 1.0
+          )
+          status_text.text(f"COMPILING... {processed_count}/{total}")
 
-                        for idx, s_row in enumerate(summary_list):
-                            tr = summary_table.rows[idx + 1]
-                            tr.height = Inches(0.7)
-                            tr.cells[0].text = str(s_row.iloc[3]); tr.cells[1].text = clean_int_str(s_row.iloc[4]); tr.cells[2].text = clean_int_str(s_row.iloc[6]); tr.cells[3].text = str(s_row.iloc[5])
-                            dt_full = pd.to_datetime(s_row.iloc[0]).strftime('%d/%m/%Y %H:%M:%S')
-                            tr.cells[4].text = f"ID: {clean_int_str(s_row.iloc[31])}\nNama: {s_row.iloc[33]}\nLaju: {clean_int_str(s_row.iloc[30])} Km/h\nMasa: {dt_full}"
-                            
-                            tr.cells[5].text = "Mematuhi" if str(s_row.iloc[8]).strip().lower() == "yes" else "Tidak Mematuhi"
-                            for cell in tr.cells:
-                                for para in cell.text_frame.paragraphs:
-                                    for run in para.runs: run.font.size = Pt(8); run.font.name = "Arial"
+        progress_bar.progress(1.0)
+        status_text.text(f"{processed_count} RECORDS RUN - DONE!")
 
-                if slide6_template: create_custom_slide(prs, slide6_template)
+        if summary_list:
+          new_summary_slide = create_custom_slide(prs, slide3_template)
+          orig_table_shape = next(
+              (s for s in new_summary_slide.shapes if s.has_table), None
+          )
+          if orig_table_shape:
+            height = orig_table_shape.height
+            rows_needed, cols_needed = len(summary_list) + 1, 6
+            new_summary_slide.shapes._spTree.remove(orig_table_shape.element)
 
-                xml_slides = prs.slides._sldIdLst
-                for _ in range(3): xml_slides.remove(xml_slides[0])
-                if len(prs.slides) >= 3:
-                    summary_slide_element = xml_slides[len(xml_slides) - 2]
-                    xml_slides.remove(summary_slide_element); xml_slides.insert(2, summary_slide_element)
-                    slide_two_element = xml_slides[1]
-                    xml_slides.remove(slide_two_element); xml_slides.insert(0, slide_two_element)
-                if len(xml_slides) >= 4: xml_slides.remove(xml_slides[3])
+            new_table_shape = new_summary_slide.shapes.add_table(
+                rows_needed,
+                cols_needed,
+                Inches(0.5),
+                Inches(1.5),
+                Inches(9.0),
+                height,
+            )
+            summary_table = new_table_shape.table
 
-                is_northern = "/NR/" in selected_siri
-                region_name = "Northern Region" if is_northern else "Central Region"
-                full_replacement_text = f"{region_name} {obs_month} {datetime.now().year}"
+            tblPr = summary_table._tbl.tblPr
+            if tblPr is not None:
+              tableStyleId = tblPr.find(
+                  "{http://schemas.openxmlformats.org/drawingml/2006/main}tableStyleId"
+              )
+              if tableStyleId is not None:
+                tableStyleId.text = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
 
-                for slide in prs.slides:
-                    for shape in slide.shapes:
-                        # 1. PROCESS STANDARD TEXT FRAMES
-                        if shape.has_text_frame:
-                            if is_northern:
-                                current_text = shape.text_frame.text
-                                if "Mohd Shahfiee Abdullah" in current_text or "Quality Improvement Central Region" in current_text:
-                                    apply_nr_manager_formatting(shape.text_frame)
+            summary_table.columns[0].width = Inches(1.2)
+            summary_table.columns[1].width = Inches(0.8)
+            summary_table.columns[2].width = Inches(1.0)
+            summary_table.columns[3].width = Inches(2.2)
+            summary_table.columns[4].width = Inches(2.6)
+            summary_table.columns[5].width = Inches(1.2)
 
-                            if "Januari-February 2026" in shape.text_frame.text:
-                                for paragraph in shape.text_frame.paragraphs:
-                                    if "Januari-February 2026" in paragraph.text:
-                                        paragraph.text = paragraph.text.replace("Januari-February 2026", full_replacement_text)
-                                        for run in paragraph.runs: run.font.name = 'Arial'; run.font.size = Pt(20); run.font.color.rgb = RGBColor(0, 32, 96)
-                            if "OE/SQI/CR/VO/001/2026" in shape.text_frame.text:
-                                for paragraph in shape.text_frame.paragraphs:
-                                    if "OE/SQI/CR/VO/001/2026" in paragraph.text:
-                                        paragraph.text = paragraph.text.replace("OE/SQI/CR/VO/001/2026", selected_siri)
-                                        for run in paragraph.runs: run.font.size = Pt(12)
+            headers = [
+                "Depoh",
+                "Laluan",
+                "Nombor Bas",
+                "Hentian Bas",
+                "Pengesahan",
+                "Status",
+            ]
+            for i, h_text in enumerate(headers):
+              cell = summary_table.rows[0].cells[i]
+              cell.text = h_text
+              for para in cell.text_frame.paragraphs:
+                for run in para.runs:
+                  run.font.size = Pt(10)
+                  run.font.bold = True
 
-                        # 2. PROCESS TEXT DEEP INSIDE TABLE CELLS
-                        if shape.has_table:
-                            for row_idx in range(len(shape.table.rows)):
-                                for col_idx in range(len(shape.table.columns)):
-                                    cell = shape.table.cell(row_idx, col_idx)
-                                    if is_northern and ("Mohd Shahfiee Abdullah" in cell.text or "Quality Improvement Central Region" in cell.text):
-                                        apply_nr_manager_formatting(cell.text_frame)
+            for idx, s_row in enumerate(summary_list):
+              tr = summary_table.rows[idx + 1]
+              tr.height = Inches(0.7)
+              tr.cells[0].text = str(s_row.iloc[3])
+              tr.cells[1].text = clean_int_str(s_row.iloc[4])
+              tr.cells[2].text = clean_int_str(s_row.iloc[6])
+              tr.cells[3].text = str(s_row.iloc[5])
+              dt_full = pd.to_datetime(s_row.iloc[0]).strftime(
+                  "%d/%m/%Y %H:%M:%S"
+              )
+              tr.cells[4].text = (
+                  f"ID: {clean_int_str(s_row.iloc[31])}\nNama:"
+                  f" {s_row.iloc[33]}\nLaju:"
+                  f" {clean_int_str(s_row.iloc[30])} Km/h\nMasa: {dt_full}"
+              )
 
-                ppt_output = io.BytesIO()
-                prs.save(ppt_output)
-                ppt_output.seek(0)
-                
-                duration = time.time() - start_time
-                st.success(f"COMPLETE: {int(duration // 60)}M {int(duration % 60)}S")
-                
-                st.download_button(
-                    label="DOWNLOAD GENERATED PPTX",
-                    data=ppt_output,
-                    file_name=f"{report_title if report_title else 'Report'}.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
-        except Exception as e:
-            st.error(f"SYSTEM ERROR: {str(e)}")
+              tr.cells[5].text = (
+                  "Mematuhi"
+                  if str(s_row.iloc[8]).strip().lower() == "yes"
+                  else "Tidak Mematuhi"
+              )
+              for cell in tr.cells:
+                for para in cell.text_frame.paragraphs:
+                  for run in para.runs:
+                    run.font.size = Pt(8)
+                    run.font.name = "Arial"
+
+        if slide6_template:
+          create_custom_slide(prs, slide6_template)
+
+        xml_slides = prs.slides._sldIdLst
+        for _ in range(3):
+          xml_slides.remove(xml_slides[0])
+        if len(prs.slides) >= 3:
+          summary_slide_element = xml_slides[len(xml_slides) - 2]
+          xml_slides.remove(summary_slide_element)
+          xml_slides.insert(2, summary_slide_element)
+          slide_two_element = xml_slides[1]
+          xml_slides.remove(slide_two_element)
+          xml_slides.insert(0, slide_two_element)
+        if len(xml_slides) >= 4:
+          xml_slides.remove(xml_slides[3])
+
+        is_northern = "/NR/" in selected_siri
+        region_name = (
+            "Northern Region" if is_northern else "Central Region"
+        )
+        full_replacement_text = (
+            f"{region_name} {obs_month} {datetime.now().year}"
+        )
+
+        for slide in prs.slides:
+          for shape in slide.shapes:
+            # 1. PROCESS STANDARD TEXT FRAMES
+            if shape.has_text_frame:
+              if is_northern:
+                current_text = shape.text_frame.text
+                if (
+                    "Mohd Shahfiee Abdullah" in current_text
+                    or "Quality Improvement Central Region" in current_text
+                ):
+                  apply_nr_manager_formatting(shape.text_frame)
+
+              if "Januari-February 2026" in shape.text_frame.text:
+                for paragraph in shape.text_frame.paragraphs:
+                  if "Januari-February 2026" in paragraph.text:
+                    paragraph.text = paragraph.text.replace(
+                        "Januari-February 2026", full_replacement_text
+                    )
+                    for run in paragraph.runs:
+                      run.font.name = "Arial"
+                      run.font.size = Pt(20)
+                      run.font.color.rgb = RGBColor(0, 32, 96)
+              if "OE/SQI/CR/VO/001/2026" in shape.text_frame.text:
+                for paragraph in shape.text_frame.paragraphs:
+                  if "OE/SQI/CR/VO/001/2026" in paragraph.text:
+                    paragraph.text = paragraph.text.replace(
+                        "OE/SQI/CR/VO/001/2026", selected_siri
+                    )
+                    for run in paragraph.runs:
+                      run.font.size = Pt(12)
+
+            # 2. PROCESS TEXT DEEP INSIDE TABLE CELLS
+            if shape.has_table:
+              for row_idx in range(len(shape.table.rows)):
+                for col_idx in range(len(shape.table.columns)):
+                  cell = shape.table.cell(row_idx, col_idx)
+                  if is_northern and (
+                      "Mohd Shahfiee Abdullah" in cell.text
+                      or "Quality Improvement Central Region" in cell.text
+                  ):
+                    apply_nr_manager_formatting(cell.text_frame)
+
+        ppt_output = io.BytesIO()
+        prs.save(ppt_output)
+        ppt_output.seek(0)
+
+        duration = time.time() - start_time
+        st.success(f"COMPLETE: {int(duration // 60)}M {int(duration % 60)}S")
+
+        st.download_button(
+            label="DOWNLOAD GENERATED PPTX",
+            data=ppt_output,
+            file_name=f"{report_title if report_title else 'Report'}.pptx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            ),
+            use_container_width=True,
+        )
+    except Exception as e:
+      st.error(f"SYSTEM ERROR: {str(e)}")
