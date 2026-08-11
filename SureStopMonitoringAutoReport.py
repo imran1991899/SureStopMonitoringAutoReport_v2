@@ -461,7 +461,7 @@ if generate_btn:
                             tr.height = Inches(0.7)
                             tr.cells[0].text = str(s_row.iloc[3]); tr.cells[1].text = clean_int_str(s_row.iloc[4]); tr.cells[2].text = clean_int_str(s_row.iloc[6]); tr.cells[3].text = str(s_row.iloc[5])
                             dt_full = pd.to_datetime(s_row.iloc[0]).strftime('%d/%m/%Y %H:%M:%S')
-                            tr.cells[4].text = f"ID: {clean_int_str(s_row.iloc[31])}\nNama: {s_row.iloc[33]}\nLaju: {clean_int_str(s_row.iloc[30])} Km/h\nMasa: {dt_full}"
+                            tr.cells[36].text = f"ID: {clean_int_str(s_row.iloc[31])}\nNama: {s_row.iloc[33]}\nLaju: {clean_int_str(s_row.iloc[30])} Km/h\nMasa: {dt_full}"
                             
                             tr.cells[5].text = "Mematuhi" if str(s_row.iloc[8]).strip().lower() == "yes" else "Tidak Mematuhi"
                             for cell in tr.cells:
