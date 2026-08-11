@@ -396,7 +396,7 @@ if generate_btn:
                     replacements = {
                         "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
                         "Nombor Bas :": f"Nombor Bas : {clean_int_str(row.iloc[6])}",
-                        "Laluan pemerhatian :": f"Laluan pemerhatian : {clean_int_str(row.iloc[4])}",
+                        "Laluan pemerhatian :": f"Laluan pemerhatian : {clean_int_str(row.iloc[36])}",
                         "Masa :": f"Masa : {time_str}",
                         "Lokasi / Hentian :": f"Lokasi / Hentian : {row.iloc[5]}",
                         "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[33]}",
