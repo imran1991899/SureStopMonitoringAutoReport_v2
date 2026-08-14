@@ -402,7 +402,7 @@ if generate_btn:
                         "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[33]}",
                         "ID Kapten Bas :": f"ID Kapten Bas : {clean_int_str(row.iloc[31])}",
                         "Kelajuan Dipandu :": f"Kelajuan Dipandu : {clean_int_str(row.iloc[30])} Km/h",
-                        "Nama PIC :": f"Nama PIC : {row.iloc[2]}",
+                        "Nama PIC :": f"Pemerhati : {row.iloc[2]}",
                         "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
                         "Cadangan:": f"Cadangan:\n{cadangan}"
                     }
