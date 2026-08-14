@@ -378,20 +378,65 @@ if generate_btn:
                     date_str = dt_raw.strftime('%d/%m/%Y') if not pd.isnull(dt_raw) else "N/A"
                     time_str = dt_raw.strftime('%H:%M:%S') if not pd.isnull(dt_raw) else "N/A"
 
-                    col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
+                   col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
                     
-                    if is_compliant and col_j == "yes":
-                        pemerhatian = "1. Pemanduan mematuhi peraturan.\n"
-                        cadangan = "1. Teruskan prestasi pemanduan yang cemerlang dan selamat."
-                    else:
-                        pemerhatian = ""
-                        if col_i == "no": pemerhatian += "1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n"
-                        if col_j == "no": pemerhatian += "2. Kapten Bas tidak memandu / menggunakan lorong kiri"
+                    pemerhatian_list = []
+                    cadangan_list = []
 
-                        cadangan = ""
-                        if col_i == "no" and col_j == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas and keperluan berada di lorong kiri."
-                        elif col_i == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas."
-                        elif col_j == "no": cadangan = "2. Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri."
+                    # 1 & 2: Driving observations & suggestions
+                    if is_compliant and col_j == "yes":
+                        pemerhatian_list.append("Pemanduan mematuhi peraturan.")
+                        cadangan_list.append("Teruskan prestasi pemanduan yang cemerlang dan selamat.")
+                    else:
+                        if col_i == "no": 
+                            pemerhatian_list.append("Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.")
+                        if col_j == "no": 
+                            pemerhatian_list.append("Kapten Bas tidak memandu / menggunakan lorong kiri")
+
+                        if col_i == "no" and col_j == "no":
+                            cadangan_list.append("Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas and keperluan berada di lorong kiri.")
+                        elif col_i == "no":
+                            cadangan_list.append("Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas.")
+                        elif col_j == "no":
+                            cadangan_list.append("Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri.")
+
+                    # 3: Bus stop obstruction/visibility conditions (Columns 18, 19, 21)
+                    obs_conditions = []
+                    if str(row.iloc[18]).strip().lower() == "yes":
+                        obs_conditions.append("terlindung dari pandangan BC")
+                    if str(row.iloc[19]).strip().lower() == "yes":
+                        obs_conditions.append("terhalang oleh kenderaan parkir")
+                    if str(row.iloc[21]).strip().lower() == "yes":
+                        obs_conditions.append("Terdapat pembinaan berhampiran")
+
+                    if obs_conditions:
+                        if len(obs_conditions) == 1:
+                            cond_text = obs_conditions[0]
+                        else:
+                            cond_text = ", ".join(obs_conditions[:-1]) + " dan " + obs_conditions[-1]
+                        pemerhatian_list.append(f"Hentian {cond_text}")
+
+                    # 4: Missing bus stop infrastructure (Columns 22, 23, 24, 25)
+                    missing_facilities = []
+                    if str(row.iloc[22]).strip().lower() == "no":
+                        missing_facilities.append("Bumbung")
+                    if str(row.iloc[23]).strip().lower() == "no":
+                        missing_facilities.append("Tiang")
+                    if str(row.iloc[24]).strip().lower() == "no":
+                        missing_facilities.append("Petak Hentian")
+                    if str(row.iloc[25]).strip().lower() == "no":
+                        missing_facilities.append("layby")
+
+                    if missing_facilities:
+                        if len(missing_facilities) == 1:
+                            fac_text = missing_facilities[0]
+                        else:
+                            fac_text = ", ".join(missing_facilities[:-1]) + " dan " + missing_facilities[-1]
+                        pemerhatian_list.append(f"Keadaan hentian ini tidak mempunyai {fac_text}")
+
+                    # Format numbered lists dynamically
+                    pemerhatian = "\n".join([f"{i+1}. {item}" for i, item in enumerate(pemerhatian_list)])
+                    cadangan = "\n".join([f"{i+1}. {item}" for i, item in enumerate(cadangan_list)])
 
                     replacements = {
                         "Tarikh pemerhatian :": f"Tarikh pemerhatian : {date_str}",
@@ -406,7 +451,6 @@ if generate_btn:
                         "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
                         "Cadangan:": f"Cadangan:\n{cadangan}"
                     }
-
                     for shape in new_data_slide.shapes:
                         if shape.has_table:
                             for r in shape.table.rows:
