@@ -422,7 +422,7 @@ if generate_btn:
                                 item4_str = ", ".join(item4_parts[:-1]) + " dan " + item4_parts[-1]
                             else:
                                 item4_str = item4_parts[0]
-                            pemerhatian_lines.append(f"4. Keadaan hentian ini tidak mempunyai... {item4_str}")
+                            pemerhatian_lines.append(f"4. Keadaan hentian ini tidak mempunyai {item4_str}")
 
                         pemerhatian = "\n".join(pemerhatian_lines)
 
