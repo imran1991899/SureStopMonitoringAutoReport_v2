@@ -381,12 +381,50 @@ if generate_btn:
                     col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
                     
                     if is_compliant and col_j == "yes":
-                        pemerhatian = "1. Pemanduan mematuhi peraturan.\n"
+                        pemerhatian = "1. Pemanduan mematuhi peraturan."
                         cadangan = "1. Teruskan prestasi pemanduan yang cemerlang dan selamat."
                     else:
-                        pemerhatian = ""
-                        if col_i == "no": pemerhatian += "1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.\n"
-                        if col_j == "no": pemerhatian += "2. Kapten Bas tidak memandu / menggunakan lorong kiri"
+                        pemerhatian_lines = []
+                        if col_i == "no":
+                            pemerhatian_lines.append("1. Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.")
+                        if col_j == "no":
+                            pemerhatian_lines.append("2. Kapten Bas tidak memandu / menggunakan lorong kiri")
+
+                        # Item 3 evaluation (Columns 18, 19, 21 if 'yes')
+                        item3_parts = []
+                        if str(row.iloc[18]).strip().lower() == "yes":
+                            item3_parts.append("Hentian terlindung dari pandangan BC")
+                        if str(row.iloc[19]).strip().lower() == "yes":
+                            item3_parts.append("terhalang oleh kenderaan parkir")
+                        if str(row.iloc[21]).strip().lower() == "yes":
+                            item3_parts.append("Terdapat pembinaan berhampiran")
+
+                        if item3_parts:
+                            if len(item3_parts) > 1:
+                                item3_str = ", ".join(item3_parts[:-1]) + " dan " + item3_parts[-1]
+                            else:
+                                item3_str = item3_parts[0]
+                            pemerhatian_lines.append(f"3. {item3_str}")
+
+                        # Item 4 evaluation (Columns 22, 23, 24, 25 if 'no')
+                        item4_parts = []
+                        if str(row.iloc[22]).strip().lower() == "no":
+                            item4_parts.append("Bumbung")
+                        if str(row.iloc[23]).strip().lower() == "no":
+                            item4_parts.append("Tiang")
+                        if str(row.iloc[24]).strip().lower() == "no":
+                            item4_parts.append("Petak Hentian")
+                        if str(row.iloc[25]).strip().lower() == "no":
+                            item4_parts.append("layby")
+
+                        if item4_parts:
+                            if len(item4_parts) > 1:
+                                item4_str = ", ".join(item4_parts[:-1]) + " dan " + item4_parts[-1]
+                            else:
+                                item4_str = item4_parts[0]
+                            pemerhatian_lines.append(f"4. Keadaan hentian ini tidak mempunyai... {item4_str}")
+
+                        pemerhatian = "\n".join(pemerhatian_lines)
 
                         cadangan = ""
                         if col_i == "no" and col_j == "no": cadangan = "1. Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas and keperluan berada di lorong kiri."
