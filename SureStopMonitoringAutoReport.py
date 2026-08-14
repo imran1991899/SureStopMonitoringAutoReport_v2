@@ -378,7 +378,7 @@ if generate_btn:
                     date_str = dt_raw.strftime('%d/%m/%Y') if not pd.isnull(dt_raw) else "N/A"
                     time_str = dt_raw.strftime('%H:%M:%S') if not pd.isnull(dt_raw) else "N/A"
 
-                   col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
+                    col_i, col_j = str(row.iloc[8]).lower(), str(row.iloc[9]).lower()
                     
                     pemerhatian_list = []
                     cadangan_list = []
@@ -389,21 +389,21 @@ if generate_btn:
                         cadangan_list.append("Teruskan prestasi pemanduan yang cemerlang dan selamat.")
                     else:
                         if col_i == "no": 
-                            pemerhatian_list.append("Pelanggaran Had Laju Hentian: BC memintas hentian dengan kelajuan melebihi 25 km/j.")
+                            pemerhatian_list.append("Pelanggaran Had Laju Hentian: Staf memintas hentian dengan kelajuan melebihi 25 km/j.")
                         if col_j == "no": 
-                            pemerhatian_list.append("Kapten Bas tidak memandu / menggunakan lorong kiri")
+                            pemerhatian_list.append("Staf tidak memandu / menggunakan lorong kiri")
 
                         if col_i == "no" and col_j == "no":
-                            cadangan_list.append("Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas and keperluan berada di lorong kiri.")
+                            cadangan_list.append("Memberi peringatan/kaunseling kepada Staf memperlahankan bas dan keperluan berada di lorong kiri.")
                         elif col_i == "no":
-                            cadangan_list.append("Memberi peringatan/kaunseling kepada Kapten Bas memperlahankan bas di setiap hentian bas.")
+                            cadangan_list.append("Memberi peringatan/kaunseling kepada Staf memperlahankan bas di setiap hentian bas.")
                         elif col_j == "no":
-                            cadangan_list.append("Memberi peringatan kepada Kapten Bas mengenai keperluan berada di lorong kiri.")
+                            cadangan_list.append("Memberi peringatan kepada Staf mengenai keperluan berada di lorong kiri.")
 
                     # 3: Bus stop obstruction/visibility conditions (Columns 18, 19, 21)
                     obs_conditions = []
                     if str(row.iloc[18]).strip().lower() == "yes":
-                        obs_conditions.append("terlindung dari pandangan BC")
+                        obs_conditions.append("terlindung dari pandangan Staf")
                     if str(row.iloc[19]).strip().lower() == "yes":
                         obs_conditions.append("terhalang oleh kenderaan parkir")
                     if str(row.iloc[21]).strip().lower() == "yes":
@@ -444,11 +444,14 @@ if generate_btn:
                         "Laluan pemerhatian :": f"Laluan pemerhatian : {clean_int_str(row.iloc[36])}",
                         "Masa :": f"Masa : {time_str}",
                         "Lokasi / Hentian :": f"Lokasi / Hentian : {row.iloc[5]}",
-                        "Nama Kapten Bas :": f"Nama Kapten Bas : {row.iloc[33]}",
-                        "ID Kapten Bas :": f"ID Kapten Bas : {clean_int_str(row.iloc[31])}",
+                        "Nama Kapten Bas :": f"Nama Staf : {row.iloc[33]}",
+                        "ID Kapten Bas :": f"ID Staf : {clean_int_str(row.iloc[31])}",
+                        "Nama Staf :": f"Nama Staf : {row.iloc[33]}",
+                        "ID Staf :": f"ID Staf : {clean_int_str(row.iloc[31])}",
                         "Kelajuan Dipandu :": f"Kelajuan Dipandu : {clean_int_str(row.iloc[30])} Km/h",
                         "Nama PIC :": f"Pemerhati : {row.iloc[2]}",
-                        "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Kapten Bas :\n{pemerhatian}",
+                        "Pemerhatian Pemanduan Kapten Bas :": f"Pemerhatian Pemanduan Staf :\n{pemerhatian}",
+                        "Pemerhatian Pemanduan Staf :": f"Pemerhatian Pemanduan Staf :\n{pemerhatian}",
                         "Cadangan:": f"Cadangan:\n{cadangan}"
                     }
                     for shape in new_data_slide.shapes:
